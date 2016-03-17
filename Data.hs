@@ -1,5 +1,7 @@
 module Data where
 
+import Language.Haskell.Exts (SrcLoc)
+
 -- Type variable in let polymorphic
 type TName = Int
 
@@ -7,10 +9,10 @@ type TName = Int
 type LName = Int
 
 -- Variables
-type VName = Int
+type VName = (SrcLoc, String)
 
 -- Assign every term an unique label
-type Label = Int
+type Label = SrcLoc
 
 -- A set of labels for annotated type
 type LabelSet = [Label]
