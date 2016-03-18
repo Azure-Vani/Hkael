@@ -17,3 +17,6 @@ cabal.sandbox.config
 
 test.hs
 analysis*
+
+*.swp
+*.swo
