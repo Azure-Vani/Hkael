@@ -9,17 +9,17 @@ type TName = Int
 type LName = Int
 
 -- Variables
-type VName = (SrcLoc, String)
+type VName = String
 
 -- Assign every term an unique label
-type Label = SrcLoc
+type Label = Int
 
 -- A set of labels for annotated type
 type LabelSet = [Label]
 
 -- Flow Properties
 data Fp = Lset LabelSet
-        | Var LName
+        | Variable LName
         | Union Fp Fp
         | DummyFp
 
@@ -39,3 +39,4 @@ type FpCons = [(Fp, Fp)]
 
 type TyCons = [(Type, Type)]
 
+type TypedProg= [(Label, Type)]

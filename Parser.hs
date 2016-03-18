@@ -1,6 +1,8 @@
+{-# LANGUAGE TypeOperators #-}
 module Parser where
 
 import Data.Monoid
+import Data.Maybe
 
 import Control.Monad
 import Control.Monad.Trans
@@ -14,62 +16,110 @@ import Data
 import Utils
 import ControlFlow
 
-type TypedProg= [(SrcLoc, Type)]
-
 data Environment = Env
     { types :: TyEnv
     }
 
-addTypeEnv :: VName -> Type -> Environment -> Environment
-addTypeEnv name ty env = Env $ (:) ((,) name ty) (types env)
+data Used = Used
+    { usedTypeNames :: TName
+    , usedLabel     :: Label
+    }
 
 data Records = Constraints
-    { fpCons :: FpCons
-    , tyCons :: TyCons
+    { fpCons    :: FpCons
+    , tyCons    :: TyCons
     , typedProg :: TypedProg
-    , usedTypeNames :: [TName]
     }
 
 instance Monoid Records where
     mempty = Constraints { fpCons = mempty
                   , tyCons = mempty
                   , typedProg = mempty
-                  , usedTypeNames = mempty
                   }
 
     mappend x y = Constraints { fpCons = fpCons x `mappend` fpCons y
                        , tyCons = tyCons x `mappend` tyCons y
                        , typedProg = typedProg x `mappend` typedProg y
-                       , usedTypeNames = usedTypeNames x `mappend` usedTypeNames y
                        }
 
-type Result = StateT Environment (WriterT Records IO)
+type RecordsM = WriterT Records IO
+type UsedM    = StateT Used RecordsM
+type Result   = StateT Environment UsedM
 
-updateEnvTypes :: Environment -> TyEnv -> Environment
-updateEnvTypes = undefined
+-- Environment operations
+addType :: VName -> Type -> Environment -> Environment
+addType name ty env = Env $ (:) ((,) name ty) (types env)
 
-parsePat :: Pat -> Result Type
-parsePat = undefined
+lookupType :: VName -> Environment -> Type
+lookupType name env = fromJust $ lookup name (types env)
 
-parser :: FilePath -> Result ()
-parser filename = do
-    parsedModuleWithIO <- lift $ lift $ parseFile filename
-    let parsedModule = fromParseResult parsedModuleWithIO
-    case parsedModule of
-        Module _ name _ _ _ _ decls -> parseDecls decls
+-- Used operations
+renewLabel :: Used -> (Label, Used)
+renewLabel used = (oldLable, used { usedLabel = oldLable + 1 })
+    where oldLable = usedLabel used
 
+renewTypeName :: Used -> (TName, Used)
+renewTypeName used = (oldTypeName, used { usedTypeNames = oldTypeName + 1 }) 
+    where oldTypeName = usedTypeNames used
+
+getLabel :: UsedM Label
+getLabel = do
+    used <- get
+    let (label, renewUsed) = renewLabel used
+    put renewUsed
+    return label
+
+getTypeName :: UsedM Label
+getTypeName = do
+    used <- get
+    let (label, renewUsed) = renewLabel used
+    put renewUsed
+    return label
+
+-- Parsers
 serializedParse :: Monoid b => [a] -> (a -> Result b) -> Result b
 serializedParse [] f     = return mempty
 serializedParse (x:xs) f = (liftM2 mappend) (f x) (serializedParse xs f)
 
-parseDecls :: [Decl] -> Result ()
-parseDecls decls = serializedParse decls parseDecl
+parser :: FilePath -> Result ()
+parser filename = do
+    parsedModuleWithIO <- lift $ lift $ lift $ parseFile filename
+    let parsedModule = fromParseResult parsedModuleWithIO
+    case parsedModule of
+        Module _ name _ _ _ _ decls -> serializedParse decls parseDecl
+
+parsePat :: Pat -> Result Type
+parsePat = undefined
 
 parseBinds :: Binds -> Result ()
-parseBinds = undefined
+parseBinds bind = case bind of
+    BDecls decls -> serializedParse decls parseDecl
+    IPBinds _    -> undefined
+
+parseStmt :: Stmt -> Result ()
+parseStmt = undefined
+
+parseExp :: Exp -> Result Type
+parseExp exp = case exp of
+    Var qName -> do
+        env <- get
+        label <- lift getLabel
+        let ty = lookupType (extractQName qName) env
+        lift $ lift $ tell $ Constraints {fpCons = mempty, tyCons = mempty, typedProg = [(label, ty)]}
+        return ty
 
 parseRhs :: Rhs -> Result Type
-parseRhs   = undefined
+parseRhs rhs = case rhs of
+    UnGuardedRhs exp -> parseExp exp
+    GuardedRhss guardedRhss -> do
+        tys <- mapM parseGuardedRhs guardedRhss
+        return $ head tys
+
+parseGuardedRhs :: GuardedRhs -> Result Type
+parseGuardedRhs guardedRhs = case guardedRhs of
+    GuardedRhs srcLoc stmts exp -> do
+        serializedParse stmts parseStmt
+        parseExp exp
 
 parseMatch :: Match -> Result ()
 parseMatch match = case match of
@@ -84,10 +134,10 @@ parseMatch match = case match of
             Nothing -> return ()
         -- parse function body
         bodyTy <- parseRhs rhs
-        let funcName = makeVName srcLoc $ extractName name
+        let funcName = extractName name
         let funcTy = makeFunTy (argTys ++ [bodyTy])
         -- recovery env and add this function to env
-        put $ addTypeEnv funcName funcTy env
+        put $ addType funcName funcTy env
         return  ()
 
 parseDecl :: Decl -> Result ()
