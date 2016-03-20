@@ -10,71 +10,12 @@ import Control.Monad.Trans.State
 import Control.Monad.Trans.Writer
 
 import Language.Haskell.Exts (parseFile, fromParseResult)
-import Language.Haskell.Exts.Syntax hiding (Type)
+import Language.Haskell.Exts.Syntax hiding (Type, TyFun, TyTuple, TyList, TyApp, TyVar, TyCon)
 
 import Data
+import Environments
 import Utils
-import ControlFlow
-
-data Environment = Env
-    { types :: TyEnv
-    }
-
-data Used = Used
-    { usedTypeNames :: TName
-    , usedLabel     :: Label
-    }
-
-data Records = Constraints
-    { fpCons    :: FpCons
-    , tyCons    :: TyCons
-    , typedProg :: TypedProg
-    }
-
-instance Monoid Records where
-    mempty = Constraints { fpCons = mempty
-                  , tyCons = mempty
-                  , typedProg = mempty
-                  }
-
-    mappend x y = Constraints { fpCons = fpCons x `mappend` fpCons y
-                       , tyCons = tyCons x `mappend` tyCons y
-                       , typedProg = typedProg x `mappend` typedProg y
-                       }
-
-type RecordsM = WriterT Records IO
-type UsedM    = StateT Used RecordsM
-type Result   = StateT Environment UsedM
-
--- Environment operations
-addType :: VName -> Type -> Environment -> Environment
-addType name ty env = Env $ (:) ((,) name ty) (types env)
-
-lookupType :: VName -> Environment -> Type
-lookupType name env = fromJust $ lookup name (types env)
-
--- Used operations
-renewLabel :: Used -> (Label, Used)
-renewLabel used = (oldLable, used { usedLabel = oldLable + 1 })
-    where oldLable = usedLabel used
-
-renewTypeName :: Used -> (TName, Used)
-renewTypeName used = (oldTypeName, used { usedTypeNames = oldTypeName + 1 }) 
-    where oldTypeName = usedTypeNames used
-
-getLabel :: UsedM Label
-getLabel = do
-    used <- get
-    let (label, renewUsed) = renewLabel used
-    put renewUsed
-    return label
-
-getTypeName :: UsedM Label
-getTypeName = do
-    used <- get
-    let (label, renewUsed) = renewLabel used
-    put renewUsed
-    return label
+import Constraints
 
 -- Parsers
 serializedParse :: Monoid b => [a] -> (a -> Result b) -> Result b
@@ -99,14 +40,58 @@ parseBinds bind = case bind of
 parseStmt :: Stmt -> Result ()
 parseStmt = undefined
 
+atomVariable :: QName -> Result Type
+atomVariable qname = do
+    env <- get
+    label <- lift getLabel
+    let ty = lookupType (extractQName qname) env
+    lift $ lift $ tell $ createByTypedProg [(label, ty)]
+    return ty
+
 parseExp :: Exp -> Result Type
 parseExp exp = case exp of
-    Var qName -> do
-        env <- get
+    Var qname -> atomVariable qname
+    Con qname -> atomVariable qname
+
+    Lit lit -> do
         label <- lift getLabel
-        let ty = lookupType (extractQName qName) env
-        lift $ lift $ tell $ Constraints {fpCons = mempty, tyCons = mempty, typedProg = [(label, ty)]}
+        let fp = atomfp label
+        let ty = case lit of
+                Char c    -> TyCon tyString fp
+                Int  i    -> TyCon tyInt    fp
+                String st -> TyCon tyString fp
         return ty
+
+    InfixApp exp1 op exp2 -> do
+        -- add constraint ty1 -> ty2 -> ty = type(op)
+        ty1 <- parseExp exp1
+        let opname = case op of 
+                QVarOp qname -> qname
+                QConOp qname -> qname
+        tyop <- atomVariable opname
+        ty2  <- parseExp exp2
+        ty   <- lift $ getType
+        t'   <- lift $ makeFunTy [ty1, ty2, ty] Nothing
+        lift $ lift $ constrain t' tyop
+        return ty
+
+    App exp1 exp2 -> do
+        -- add constraint ty2 -> ty = type(exp1)
+        ty1 <- parseExp exp1
+        ty2 <- parseExp exp2
+        ty  <- lift $ getType   
+        x   <- lift $ makeFunTy [ty2, ty] Nothing
+        lift $ lift $ constrain x ty1
+        return ty
+
+    Lambda srcLoc pats exp -> do
+        env <- get
+        argTys <- mapM parsePat pats
+        bodyTy <- parseExp exp
+        label <- lift $ getLabel
+        let fp = atomfp label
+        lift $ makeFunTy (argTys ++ [bodyTy]) Nothing
+        
 
 parseRhs :: Rhs -> Result Type
 parseRhs rhs = case rhs of
@@ -135,7 +120,7 @@ parseMatch match = case match of
         -- parse function body
         bodyTy <- parseRhs rhs
         let funcName = extractName name
-        let funcTy = makeFunTy (argTys ++ [bodyTy])
+        funcTy <- lift $ makeFunTy (argTys ++ [bodyTy]) Nothing
         -- recovery env and add this function to env
         put $ addType funcName funcTy env
         return  ()

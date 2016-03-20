@@ -20,5 +20,3 @@ extractQName x = case x of
         FunCon           -> "fun"
         TupleCon boxed x -> "tuple" ++ show x
 
-makeFunTy :: [Type] -> Type
-makeFunTy = undefined

@@ -2,4 +2,4 @@ module ControlFlow where
 
 import Language.Haskell.Exts
 
-type CF = SrcLoc -> [SrcLoc]
+type CF = Label -> LabelSet

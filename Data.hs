@@ -28,15 +28,18 @@ data Type = TyTuple [Type] Fp
           | TyList Type Fp
           | TyFun Type Type Fp
           | TyApp Type Type Fp
-          | TVar TName Fp
+          | TyVar TName Fp
           | TyCon String Fp
-          | TForall TName Type Fp
+          | TyForall TName Type Fp
           | LForall LName FpCons Type
 
-type TyEnv = [(VName, Type)]
+type TyEnv     = [(VName, Type)]
+type FpCons    = [(Fp, Fp)]
+type TyCons    = [(Type, Type)]
+type TypedProg = [(Label, Type)]
 
-type FpCons = [(Fp, Fp)]
+tyChar   = "char"
+tyString = "string"
+tyInt    = "int"
 
-type TyCons = [(Type, Type)]
-
-type TypedProg= [(Label, Type)]
+atomfp l = Lset [l]
