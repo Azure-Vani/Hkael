@@ -17,6 +17,9 @@ type Label = Int
 -- A set of labels for annotated type
 type LabelSet = [Label]
 
+-- Used to track term type
+type Id = Int
+
 -- Flow Properties
 data Fp = Lset LabelSet
         | Variable LName
@@ -36,10 +39,11 @@ data Type = TyTuple [Type] Fp
 type TyEnv     = [(VName, Type)]
 type FpCons    = [(Fp, Fp)]
 type TyCons    = [(Type, Type)]
-type TypedProg = [(Label, Type)]
+type TypedProg = [(Id, Type)]
 
 tyChar   = "char"
 tyString = "string"
 tyInt    = "int"
+tyBool   = "bool"
 
 atomfp l = Lset [l]

@@ -20,3 +20,8 @@ extractQName x = case x of
         FunCon           -> "fun"
         TupleCon boxed x -> "tuple" ++ show x
 
+reduceM :: Monad m => [a] -> (a -> a -> m a) -> m a
+reduceM = undefined
+
+mergeM :: Monad m => [a] -> (a -> a -> m ()) -> m ()
+mergeM = undefined

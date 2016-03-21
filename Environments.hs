@@ -3,6 +3,7 @@ module Environments where
 import Data.Maybe
 
 import Control.Monad
+import Control.Monad.Trans
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Writer
 
@@ -14,9 +15,10 @@ data Environment = Env
     }
 
 data Used = Used
-    { usedTypeNames :: TName
-    , usedLabel     :: Label
+    { usedTypeNames   :: TName
+    , usedLabel       :: Label
     , usedLabelNames  :: LName
+    , usedId          :: Id {- used to track terms -}
     }
 
 data Records = Records
@@ -60,6 +62,10 @@ renewLabelName :: Used -> (LName, Used)
 renewLabelName used = (oldLabelName, used { usedLabelNames = oldLabelName + 1 })
     where oldLabelName = usedLabelNames used
 
+renewId :: Used -> (Id, Used)
+renewId used = (oldId, used { usedId = oldId + 1})
+    where oldId = usedId used
+
 getLabel :: UsedM Label
 getLabel = do
     used <- get
@@ -86,6 +92,19 @@ getType = do
     ty <- getTypeName
     fp <- getLabelName
     return $ TyVar ty fp
+
+getId :: UsedM Id
+getId = do
+    used <- get
+    let (i, renewUsed) = renewId used
+    put renewUsed
+    return $ i
+
+trackType :: Type -> UsedM ()
+trackType t = do
+    id <- getId
+    let tp = createByTypedProg [(id, t)]
+    lift $ tell tp
 
 -- Records operations
 createByFpCons :: FpCons -> Records

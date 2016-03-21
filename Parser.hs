@@ -40,12 +40,15 @@ parseBinds bind = case bind of
 parseStmt :: Stmt -> Result ()
 parseStmt = undefined
 
+parseAlt :: Type -> Alt -> Result Type
+parseAlt = undefined
+
 atomVariable :: QName -> Result Type
 atomVariable qname = do
     env <- get
     label <- lift getLabel
     let ty = lookupType (extractQName qname) env
-    lift $ lift $ tell $ createByTypedProg [(label, ty)]
+    lift $ trackType ty
     return ty
 
 parseExp :: Exp -> Result Type
@@ -60,6 +63,7 @@ parseExp exp = case exp of
                 Char c    -> TyCon tyString fp
                 Int  i    -> TyCon tyInt    fp
                 String st -> TyCon tyString fp
+        lift $ trackType ty
         return ty
 
     InfixApp exp1 op exp2 -> do
@@ -73,6 +77,7 @@ parseExp exp = case exp of
         ty   <- lift $ getType
         t'   <- lift $ makeFunTy [ty1, ty2, ty] Nothing
         lift $ lift $ constrain t' tyop
+        lift $ trackType ty
         return ty
 
     App exp1 exp2 -> do
@@ -82,6 +87,7 @@ parseExp exp = case exp of
         ty  <- lift $ getType   
         x   <- lift $ makeFunTy [ty2, ty] Nothing
         lift $ lift $ constrain x ty1
+        lift $ trackType ty
         return ty
 
     Lambda srcLoc pats exp -> do
@@ -90,8 +96,51 @@ parseExp exp = case exp of
         bodyTy <- parseExp exp
         label <- lift $ getLabel
         let fp = atomfp label
-        lift $ makeFunTy (argTys ++ [bodyTy]) Nothing
+        ty <- lift $ makeFunTy (argTys ++ [bodyTy]) Nothing
+        put env
+        lift $ trackType ty
+        return ty
         
+    Let binds exp -> do
+        env <- get
+        parseBinds binds
+        ty <- parseExp exp
+        put env
+        lift $ trackType ty
+        return ty
+
+    If condition thenExp elseExp -> do
+        condType <- parseExp condition
+        thenType <- parseExp thenExp
+        elseType <- parseExp elseExp
+        lname    <- lift $ getLabelName 
+        lift $ lift $ constrain condType (TyCon tyBool lname)
+        lift $ lift $ constrain thenType elseType
+        lift $ trackType thenType
+        return thenType
+
+    Case exp alts -> do
+        expType <- parseExp exp
+        altTypes <- mapM (parseAlt expType) alts
+        lift $ lift $ mergeM altTypes constrain
+        lift $ trackType $ head altTypes
+        return $ head altTypes
+
+    Do stmts -> undefined
+
+    Tuple boxed exps -> do
+        expTypes <- mapM parseExp exps
+        label <- lift getLabel
+        let ty = TyTuple expTypes (atomfp label)
+        lift $ trackType ty
+        return ty
+
+    List exps -> do 
+        expTypes <- mapM parseExp exps
+        label <- lift getLabel
+        let ty = TyList (head expTypes) (atomfp label)
+        lift $ trackType ty
+        return ty
 
 parseRhs :: Rhs -> Result Type
 parseRhs rhs = case rhs of
