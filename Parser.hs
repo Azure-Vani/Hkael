@@ -30,18 +30,47 @@ parser filename = do
         Module _ name _ _ _ _ decls -> serializedParse decls parseDecl
 
 parsePat :: Pat -> Result Type
-parsePat = undefined
+parsePat pat = case pat of
+    PVar name -> do
+        env <- get
+        ty <- lift getType
+        put $ addType (extractName name) ty env
+        return ty
+
+    PLit sign lit -> parseLit lit
+
+    PInfixApp p1 qname p2 -> undefined
+          
+
+parsePatWithType :: Type -> Pat -> Result ()
+parsePatWithType = undefined
 
 parseBinds :: Binds -> Result ()
 parseBinds bind = case bind of
     BDecls decls -> serializedParse decls parseDecl
-    IPBinds _    -> undefined
 
-parseStmt :: Stmt -> Result ()
-parseStmt = undefined
+parseStmt :: Stmt -> Result (Maybe Type)
+parseStmt stmt = case stmt of
+    Generator srcLoc pat exp -> undefined 
+    Qualifier exp -> do 
+        ty <- parseExp exp
+        return $ Just ty
+    LetStmt binds -> do 
+        parseBinds binds
+        return Nothing
 
 parseAlt :: Type -> Alt -> Result Type
-parseAlt = undefined
+parseAlt expType alt = case alt of
+    Alt srcLoc pat rhs binds -> do
+        env <- get
+        case binds of 
+            Just x -> parseBinds x
+            Nothing -> return ()
+        parsePatWithType expType pat
+        ty <- parseRhs rhs
+        put env
+        lift $ trackType ty
+        return ty
 
 atomVariable :: QName -> Result Type
 atomVariable qname = do
@@ -51,18 +80,22 @@ atomVariable qname = do
     lift $ trackType ty
     return ty
 
+parseLit :: Literal -> Result Type
+parseLit lit = do
+    label <- lift getLabel
+    let fp = atomfp label
+    return $ case lit of
+        Char c    -> TyCon tyString fp
+        Int  i    -> TyCon tyInt    fp
+        String st -> TyCon tyString fp
+
 parseExp :: Exp -> Result Type
 parseExp exp = case exp of
     Var qname -> atomVariable qname
     Con qname -> atomVariable qname
 
     Lit lit -> do
-        label <- lift getLabel
-        let fp = atomfp label
-        let ty = case lit of
-                Char c    -> TyCon tyString fp
-                Int  i    -> TyCon tyInt    fp
-                String st -> TyCon tyString fp
+        ty <- parseLit lit         
         lift $ trackType ty
         return ty
 
@@ -152,7 +185,10 @@ parseRhs rhs = case rhs of
 parseGuardedRhs :: GuardedRhs -> Result Type
 parseGuardedRhs guardedRhs = case guardedRhs of
     GuardedRhs srcLoc stmts exp -> do
-        serializedParse stmts parseStmt
+        {- Not support patterns guard yet -}
+        maybeTy <- parseStmt $ head stmts
+        lname <- lift getLabelName
+        lift $ lift $ constrain (fromJust maybeTy) (TyCon tyBool lname)
         parseExp exp
 
 parseMatch :: Match -> Result ()
