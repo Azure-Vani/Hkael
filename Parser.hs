@@ -39,9 +39,14 @@ parsePat pat = case pat of
 
     PLit sign lit -> parseLit lit
 
-    PInfixApp p1 qname p2 -> undefined
-          
-
+    PInfixApp p1 qname p2 -> do
+        env <- get
+        let consTy = lookupType (extractQName qname) env
+        let (t1, t2, t3) = case consTy of 
+                TyFun t1 x _ -> case x of
+                    TyFun t2 t3 _ -> (t1, t2, t3)
+        (t1', s1) <- subsituteTyName t1 id
+        t2' <- subsituteTyName t2
 parsePatWithType :: Type -> Pat -> Result ()
 parsePatWithType = undefined
 
