@@ -1,5 +1,6 @@
 module Infer where
 
+import Text.Groom
 import Debug.Trace
 
 import Data.Map as Map
@@ -163,6 +164,6 @@ inferExpr expr = do
     sub <- Constraint.runSolve d
     let c' = apply sub c
     relation <- Constraint.runGen c'
-    trace (show relation) (return ()) -- TODO Debug
+    trace (groom relation) (return ()) -- TODO Debug
     return (apply sub ty, apply sub typedProgram)
 
