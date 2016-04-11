@@ -167,6 +167,6 @@ inferExpr expr = do
     sub <- Constraint.runSolve d
     let c' = apply sub c
     relation <- Constraint.runGen c'
-    trace (groom relation) (return ()) -- TODO Debug
-    return (apply sub ty, apply sub typedProgram)
+    let fpsub = Constraint.accumulate relation
+    return (apply fpsub $ apply sub ty, apply fpsub $ apply sub typedProgram)
 

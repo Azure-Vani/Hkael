@@ -12,6 +12,7 @@ import Debug.Trace
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
+import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Identity
 
@@ -189,7 +190,9 @@ solver (su, cs) = case cs of
 
 -- Solve flow properties constraints
 
-runGen :: [FConstraint] -> Either TypeError (Relation FP)
+type Relation = Map.Map LVar (Set.Set LVar, Set.Set Label)
+
+runGen :: [FConstraint] -> Either TypeError Relation
 runGen = runTypeErrorM . genMany
 
 decompose :: Decompose Type -> TypeErrorM Type
@@ -198,21 +201,19 @@ decompose (ArrL a) = case a of
     TyArr t1 _ _ -> return t1
     _ -> throwError $ DecompositionFail (ArrL a)
 
-type Relation a = Map.Map a (Set.Set a, Set.Set a)
-
-(<.>) :: Ord a => Relation a -> Relation a -> Relation a
+(<.>) :: Relation -> Relation -> Relation
 (<.>) = Map.unionWith (\(x1, y1) (x2, y2) -> (x1 `Set.union` x2, y1 `Set.union` y2))
 
 emptyRelation = Map.empty
 
-genMany :: [FConstraint] -> TypeErrorM (Relation FP)
+genMany :: [FConstraint] -> TypeErrorM Relation
 genMany (x:xs) = do
     m1 <- gen x
     m2 <- genMany xs
     return $ m1 <.> m2
 genMany [] = return $ emptyRelation
 
-gen :: FConstraint -> TypeErrorM (Relation FP)
+gen :: FConstraint -> TypeErrorM Relation
 gen (c1, c2) = do
     c1' <- decompose c1
     c2' <- decompose c2
@@ -230,13 +231,39 @@ gen (c1, c2) = do
         (x, TyVar _ f2) -> subset (ty2fp x) f2
         _ -> throwError $ GenerateFPConstraintFail c1 c2
 
-subset :: FP -> FP -> TypeErrorM (Relation FP)
+subset :: FP -> FP -> TypeErrorM Relation
 subset f1 f2 = case (f1, f2) of
     (FPVar v1, FPVar v2) -> 
-        return $ Map.singleton f2 (Set.singleton f1, Set.empty)
+        return $ Map.singleton v2 (Set.singleton v1, Set.empty)
     (FPSet s1, FPVar v2) -> 
-        return $ Map.singleton f2 (Set.empty, Set.singleton f1)
+        return $ Map.singleton v2 (Set.empty, s1)
     (FPSet s1, FPSet s2) | Set.isSubsetOf s1 s2 -> 
         return $ emptyRelation
     _ -> throwError $ IncompatibleFPConstraints f1 f2
+
+extendSubst :: Subst LVar FP -> LVar -> FP -> Subst LVar FP
+extendSubst (Subst s) x (FPSet l) = Subst $
+    Map.insert x (FPSet $ l `Set.union` l') s
+        where (FPSet l') = Map.findWithDefault (FPSet Set.empty) x s
+
+update :: Relation -> LVar -> (Set.Set LVar, Subst LVar FP) -> (Set.Set LVar, Subst LVar FP)
+update relation x (visit, sub) = 
+    case x `Set.member` visit of
+        True -> (visit, sub)
+        False -> case Map.lookup x relation of
+            Just (sons, fp) -> 
+                let (visit', sub') = Set.foldr 
+                        (update relation) 
+                        (Set.insert x visit, extendSubst sub x (FPSet fp)) 
+                        sons
+                in (visit', Set.foldr (\y all@(Subst sub) -> 
+                    case Map.lookup y sub of
+                        Just lset -> extendSubst all x lset
+                        Nothing -> all) sub' sons)
+            Nothing -> (visit, sub)
+
+accumulate :: Relation -> Subst LVar FP
+accumulate relation = trace (groom $ Map.keys relation) $ foldr (\x y -> snd $ 
+    update relation x (Set.empty, y))
+    emptySubst $ Map.keys relation
 
