@@ -26,21 +26,24 @@ data InferState = InferState { tyCount :: Int
                              , fpCount :: Int
                              }
 
-letters :: [String]
-letters = [1..] >>= flip replicateM ['A' .. 'Z']
+lettersTy :: [String]
+lettersTy = [1..] >>= flip replicateM ['a' .. 'z']
+
+lettersFp :: [String]
+lettersFp = [1..] >>= flip replicateM ['A' .. 'Z']
 
 freshFpvar :: Infer FP
 freshFpvar = do
     s <- get
     put s{fpCount = fpCount s + 1}
-    return $ FPVar $ LVar (letters !! fpCount s)
+    return $ FPVar $ LVar (lettersFp !! fpCount s)
 
 freshTyvar :: Infer Type
 freshTyvar = do
     l <- freshFpvar
     s <- get
     put s{tyCount = tyCount s + 1}
-    return $ TyVar (TVar (letters !! tyCount s)) l
+    return $ TyVar (TVar (lettersTy !! tyCount s)) l
 
 instantiate :: TypeScm -> Infer (Type, [FConstraint])
 instantiate (TyForall as ty) = do

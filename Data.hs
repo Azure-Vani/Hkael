@@ -60,11 +60,17 @@ typeEq (TyApp t1 t2 _) (TyApp t3 t4 _)
 typeEq (TyVar v1 _) (TyVar v2 _) | v1 == v2     = True
 typeEq _ _ = False
 
-ty2fp :: Type -> Maybe FP
-ty2fp (TyCon _ fp) = Just fp
-ty2fp (TyArr _ _ fp) = Just fp
-ty2fp (TyApp _ _ fp) = Just fp
-ty2fp _ = Nothing
+modifyFp :: Type -> FP -> Type
+modifyFp (TyCon x _) fp = TyCon x fp
+modifyFp (TyArr x y _) fp = TyArr x y fp
+modifyFp (TyApp x y _) fp = TyApp x y fp
+modifyFp (TyVar x _) fp = TyVar x fp
+
+ty2fp :: Type -> FP
+ty2fp (TyCon _ fp) = fp
+ty2fp (TyArr _ _ fp) = fp
+ty2fp (TyApp _ _ fp) = fp
+ty2fp (TyVar _ fp) = fp
 
 typeInt, typeBool, typeChar :: FP -> Type
 typeInt  = TyCon "Int"

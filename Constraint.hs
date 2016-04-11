@@ -6,6 +6,9 @@
 
 module Constraint where
 
+import Text.Groom
+import Debug.Trace
+
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
@@ -22,6 +25,7 @@ runTypeErrorM = runIdentity . runExceptT
 type Solve a = TypeErrorM a
 
 newtype Subst a b = Subst (Map.Map a b)
+        deriving (Show, Eq, Ord)
 
 emptySubst = Subst Map.empty
 
@@ -43,7 +47,7 @@ instance Substitutable TVar Type Type where
     apply _ all@(TyCon _ _)          = all
     apply sub (TyArr t1 t2 fp)       = TyArr (sub `apply` t1) (sub `apply` t2) fp
     apply sub (TyApp t1 t2 fp)       = TyApp (sub `apply` t1) (sub `apply` t2) fp
-    apply (Subst s) all@(TyVar var _)  = Map.findWithDefault all var s
+    apply (Subst s) all@(TyVar var fp)  = modifyFp (Map.findWithDefault all var s) fp
 
     fv (TyCon _ _)     = Set.empty 
     fv (TyArr t1 t2 _) = fv t1 `Set.union` fv t2
@@ -181,7 +185,7 @@ solver (su, cs) = case cs of
     [] -> return su
     (t1,t2):xs -> do 
         s <- unify t1 t2
-        solver (s `compose` su, xs)
+        solver (s `compose` su, apply s xs)
 
 -- Solve flow properties constraints
 
@@ -222,7 +226,8 @@ gen (c1, c2) = do
             r1 <- genMany [(Is t1, Is t3), (Is t2, Is t4)]
             r2 <- subset f1 f2
             return $ r1 <.> r2
-        (TyVar _ f1, TyVar _ f2) -> subset f1 f2
+        (TyVar _ f1, x) -> subset f1 (ty2fp x)
+        (x, TyVar _ f2) -> subset (ty2fp x) f2
         _ -> throwError $ GenerateFPConstraintFail c1 c2
 
 subset :: FP -> FP -> TypeErrorM (Relation FP)
