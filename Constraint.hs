@@ -66,11 +66,6 @@ instance Substitutable TVar Type FlppScm where
 
     fv (FpForall as cs ty) = fv cs `Set.union` fv ty
 
-instance Substitutable TVar Type TConstraint where
-    apply sub (t1, t2) = (sub `apply` t1, sub `apply` t2)
-
-    fv (t1, t2) = fv t1 `Set.union` fv t2
-
 instance Substitutable TVar Type FConstraint where
     apply sub (t1, t2) = (sub `apply` t1, sub `apply` t2)
 
@@ -85,13 +80,6 @@ instance Substitutable TVar Type a => Substitutable TVar Type [a] where
     apply = map . apply
 
     fv = foldr (Set.union . fv) Set.empty
-
-instance Substitutable TVar Type a => Substitutable TVar Type (Decompose a) where
-    apply s (ArrL x) = ArrL $ apply s x
-    apply s (Is x) = Is $ apply s x
-
-    fv (ArrL x) = fv x
-    fv (Is x) = fv x
 
 -- Substitution for flow properties variable
 instance Substitutable LVar FP Type where
@@ -123,11 +111,6 @@ instance Substitutable LVar FP FP where
     fv (FPSet lset) = Set.empty
     fv (FPVar var)  = Set.singleton var
 
-instance Substitutable LVar FP FConstraint where
-    apply s (f1, f2) = (s `apply` f1, s `apply` f2)
-
-    fv (f1, f2) = fv f1 `Set.union` fv f2
-
 instance Substitutable LVar FP TConstraint where
     apply s (f1, f2) = (s `apply` f1, s `apply` f2)
 
@@ -142,13 +125,6 @@ instance Substitutable LVar FP Env where
     apply s (Env e) = Env $ Map.map (apply s) e
 
     fv (Env e) = fv $ Map.elems e
-
-instance Substitutable LVar FP a => Substitutable LVar FP (Decompose a) where
-    apply s (ArrL x) = ArrL $ apply s x
-    apply s (Is x) = Is $ apply s x
-
-    fv (ArrL x) = fv x
-    fv (Is x) = fv x
 
 instance Substitutable LVar FP TypedProgram where
     apply s (loc, ty) = (loc, apply s ty) 
@@ -195,12 +171,6 @@ type Relation = Map.Map LVar (Set.Set LVar, Set.Set Label)
 runGen :: [FConstraint] -> Either TypeError Relation
 runGen = runTypeErrorM . genMany
 
-decompose :: Decompose Type -> TypeErrorM Type
-decompose (Is a) = return a
-decompose (ArrL a) = case a of
-    TyArr t1 _ _ -> return t1
-    _ -> throwError $ DecompositionFail (ArrL a)
-
 (<.>) :: Relation -> Relation -> Relation
 (<.>) = Map.unionWith (\(x1, y1) (x2, y2) -> (x1 `Set.union` x2, y1 `Set.union` y2))
 
@@ -215,16 +185,14 @@ genMany [] = return $ emptyRelation
 
 gen :: FConstraint -> TypeErrorM Relation
 gen (c1, c2) = do
-    c1' <- decompose c1
-    c2' <- decompose c2
-    case (c1', c2') of
+    case (c1, c2) of
         (TyCon t1 f1, TyCon t2 f2) | t1 == t2 -> subset f1 f2
         (TyArr t1 t2 f1, TyArr t3 t4 f2) -> do
-            r1 <- genMany [(Is t3, Is t1), (Is t2, Is t4)] 
+            r1 <- genMany [(t3, t1), (t2, t4)] 
             r2 <- subset f1 f2
             return $ r1 <.> r2
         (TyApp t1 t2 f1, TyApp t3 t4 f2) -> do
-            r1 <- genMany [(Is t1, Is t3), (Is t2, Is t4)]
+            r1 <- genMany [(t1, t3), (t2, t4)]
             r2 <- subset f1 f2
             return $ r1 <.> r2
         (TyVar _ f1, x) -> subset f1 (ty2fp x)
@@ -263,7 +231,7 @@ update relation x (visit, sub) =
             Nothing -> (visit, sub)
 
 accumulate :: Relation -> Subst LVar FP
-accumulate relation = trace (groom $ Map.keys relation) $ foldr (\x y -> snd $ 
+accumulate relation = foldr (\x y -> snd $ 
     update relation x (Set.empty, y))
     emptySubst $ Map.keys relation
 

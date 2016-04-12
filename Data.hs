@@ -12,11 +12,7 @@ newtype LVar = LVar String
     deriving (Show, Eq, Ord)
 
 -- flow properties constraint
-data Decompose a = ArrL a 
-                 | Is a
-                 deriving (Show, Ord, Eq)
-
-type FConstraint = (Decompose Type, Decompose Type)
+type FConstraint = (Type, Type)
 
 data FP = FPSet (Set.Set Label)
         | FPVar LVar 
@@ -47,8 +43,8 @@ data TypeError
     | UnboundVariables Name
     | UnificationMismatch
     | IncompatibleFPConstraints FP FP
-    | GenerateFPConstraintFail (Decompose Type) (Decompose Type)
-    | DecompositionFail (Decompose Type)
+    | GenerateFPConstraintFail Type Type
+    | DecompositionFail Type
     deriving (Show, Eq, Ord)
 
 typeEq :: Type -> Type -> Bool
@@ -76,5 +72,6 @@ typeInt, typeBool, typeChar :: FP -> Type
 typeInt  = TyCon "Int"
 typeBool = TyCon "Bool"
 typeChar = TyCon "Char"
+typeDummy = TyCon "Dummy"
 
 fpSingleton loc = FPSet $ Set.singleton $ Label loc

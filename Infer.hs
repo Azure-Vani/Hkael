@@ -55,7 +55,8 @@ instantiateFp :: FlppScm -> Infer (Type, [FConstraint])
 instantiateFp (FpForall as c ty) = do
     as' <- mapM (\_ -> freshFpvar) as
     let s = Subst $ Map.fromList $ zip as as'
-    return (apply s ty, apply s c)
+    return (apply s ty, apply s c ++ zipWith (\x y -> 
+        (typeDummy x, typeDummy $ FPVar y)) as' as)
 
 generalize :: Type -> [FConstraint] -> Infer TypeScm
 generalize ty cs = do
@@ -106,7 +107,7 @@ infer expr = case expr of
         fp <- freshFpvar
         tell [(loc, tv)]
         return (tv, d1 ++ d2 ++ [(t1, TyArr t2 tv fp)],
-                    c1 ++ c2 ++ [(Is t2, ArrL t1)])
+                    c1 ++ c2 ++ [(t1, TyArr t2 tv fp)])
 
     Lambda loc name e -> do 
        a <- freshTyvar
@@ -132,7 +133,7 @@ infer expr = case expr of
         (t2, d2, c2) <- infer e2
         (t3, d3, c3) <- infer e3
         let d' = [(t1, typeBool l), (t2, t), (t3, t)]
-        let c' = [(Is t2, Is t), (Is t3, Is t)]
+        let c' = [(t2, t), (t3, t)]
         tell [(loc, t)]
         return (t, d1 ++ d2 ++ d3 ++ d', c1 ++ c2 ++ c3 ++ c')
 
@@ -140,7 +141,7 @@ infer expr = case expr of
         tv <- freshTyvar
         (t, d, c)  <- inEnv (name, TyForall [] (FpForall [] [] tv)) (infer e)
         tell [(loc, t)]
-        return (t, (tv, t):d, (Is t, Is tv):c)
+        return (t, (tv, t):d, (t, tv):c)
 
     Op loc op e1 e2 -> do
         (t1, d1, c1) <- infer e1
