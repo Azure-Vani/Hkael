@@ -6,6 +6,7 @@
 \usepackage{mathpartir}
 \usepackage[left=2.5cm, right=2.5cm,bottom=5cm]{geometry}
 \usepackage{syntax}
+\usepackage{lstautogobble}
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{indentfirst}
@@ -24,7 +25,7 @@
 	basicstyle=\listingsfont\linespread{0.1},	
 	frame=tb,
 	keywordstyle=\bfseries\color{blue},
-	commentstyle=\itshape\color{green},
+	commentstyle=\itshape\color{gray},
 	numberstyle=\color{black}
 }
 
@@ -68,7 +69,8 @@
 	g y = f (\t -> t + y)
 	\end{lstlisting}
 	SourceGraph只能推断出g函数依赖于f函数，却无法准确地分析出f函数的的定义里$\mathrm{x\ 3}$的函数调用依赖于$\mathrm{\\t -> t + y}$的定义，即SourceGraph的控制流分析结果只停留在词法层面，而非语义层面的分析，这样的精准度对于实际应用是远远不够的。Haskell语言上另外一个控制流分析框架是shivers-cfg，但是它的开发目前已经停滞，而且根据文档的介绍，现有的代码只是对Shivers算法简单的实现，甚至没有为用户提供API接口，所以目前还无法测试其精准度。
-	
+
+	\newpage	
 	\section{语言定义}
 	出于方便起见，我们首先定义自己的一个带有Hindley-Milner类型系统的简单编程语言。为了更好地揭露算法的本质，避免无关紧要的细节对于读者理解算法的影响，我们希望这个语言的语法尽可能简洁，同时又能保留静态类型系统、多态等特性。注意本章的语言仅用于说明算法，真正的代码在Haskell语言上实现。
 	
@@ -134,7 +136,8 @@
 		\item\textbf{If} 首先需要保证用于条件判断的表达式e1是Bool类型，另外一个条件就是if语句的then分支和else分治的类型应当一致。所以将这两个约束添加进约束集合即可
 		\item\textbf{True, False, Int} 对于所有的字面量，直接返回该字面量对应的类型
 	\end{itemize}
-	
+
+\newpage
 \section{算法框架}
 有了语法和类型系统的定义之后，我们接下来就可以形式化地定义在该语言上的控制流分析。
 \subsection{标号和流属性}
@@ -293,4 +296,91 @@
 	
 	\subsection{算法总结}
 	给定待分析的表达式$e$，首先使用3.5章的类型推导规则推导出$e$的流属性类型$\kappa$，与此同时得到其类型约束集合$D$和子类型约束集合$C$。然后使用3.6中的算法求解类型约束集合，得到解$S$。将类型约束集合的解$S$应用到子类型约束集合$C$得到$C'$。接下来使用3.7中的算法将子类型约束集合转换为流属性约束集合$\mathcal{D}$, 再利用3.8中的算法求解流属性约束集合$\mathcal{D}$得到其解函数$\mathcal{F}$. 于是对于$e$中任意一子表达式$e'$，且$e'$有流属性类型$\kappa'$。那么$\ell = \mathcal{L}(\mathcal{F}(S(\kappa')))$就是$e'$的流属性，即$e'$最终可能求值结果的标号是$\ell$的一个子集。
+	\newpage
+	\section{实现细节}
+	\subsection{类型定义}
+	本框架使用Haskell实现。其核心数据结构使用如下定义：
+	\begin{lstlisting}[language=haskell]
+type Infer a = (RWST
+                   Env                
+                   [TypedProgram]    
+                   InferState         
+                   (Except TypeError) 
+                   a)                 
+	\end{lstlisting}
+	其中RWST是一个monad，实现了MonadReader, MonadWriter, MonadState接口。这里Env是一个reader monad，用于储存类型推导过程中的环境。TypedProgram是一个writer monad，用来存储各个子表达式的流属性类型。InferState是state monad，使用用来存储类型推导过程中所需要的信息，比如已使用的类型变量和流属性变量等。Except TypeError是一个except monad，用来表示类型推导过程中遇到的各种错误。
+	
+	注意到控制流分析过程中，我们频繁地进行了替换操作，于是可以定义一个Substitutable类来抽象表示这一系列操作，以后遇到需要替换的类型，直接对其实现Substitutable接口，就可以调用apply来应用一个替换、调用fv获取其自由变量：
+	\begin{lstlisting}[language=haskell]
+class Substitutable var value contr | var -> value where
+    	apply :: Subst var value -> contr -> contr
+    	fv    :: contr -> Set.Set var
+	\end{lstlisting}
+	
+	这里Subst的定义为一个Data.Map.Map类型，即Subst a b为从类型a到类型b的替换。在Substitutable的声明中，var、value和contr分别为需要替换的变量类型、替换的结果类型以及需要应用替换的类型，注意到由替换的变量类型可以直接确定其替换的结果类型（即流属性变量只可能替换为流属性，类型变量只可能替换为类型），所以我们可以使用GHC的FunctionalDependencies扩展来提供更精确的的类型信息，简化后续实例的实现。
+	
+	而整个推导算法的主体由一个函数infer实现，其中infer的类型签名为:
+	\begin{lstlisting}[language=haskell]
+infer :: Expr -> Infer (Type, [TConstraint], [FConstraint])
+	\end{lstlisting}
+	infer函数接受一个expr类型的输入，返回一个Infer monad，其中monad的结果为该表达式类型, 类型约束集合与子类型约束集合的三元组。由上文Infer monad的定义我们知道，这其中也包含了输入表达式中所有子表达式的类型、类型推导错误信息等其他信息。
+	\subsection{类型推导实现}
+	由于Haskell提供的简洁又强大的Monad编程范式，类型推导的实现异常简单，我们只以相对复杂的$Let$和$\lambda$规则作为说明。
+	\begin{lstlisting}[language=haskell]
+Let loc name e1 e2 -> do
+    (t, d, c) <- infer e1
+    case runSolve d of
+        Left error -> throwError error
+        Right sub -> do
+            t' <- local (apply sub) generalize t c
+            (tv, d', c') <- inEnv (name, t') $ 
+            			local (apply sub) (infer e2)
+            tell [(loc, tv)]
+            return (tv, d' ++ d, c' ++ c)
+	\end{lstlisting}
+	首先我们对于let语句中，所绑定给name的表达式$e_1$进行类型推导，结果为$(t, d, c)$。然后根据类型推导规则，我们对类型约束集合$d$进行求解，如果求解失败，则直接返回失败的异常即可，否则得到一个解sub。求解完毕之后，我们在应用过sub的环境之中对类型t进行泛化。这里local是定义在reader monad上的一个函数，其类型签名为
+	\begin{lstlisting}[language=haskell]
+local :: (e -> e) -> m a -> ma
+	\end{lstlisting}
+	接受一个修改reader monad的环境的函数以及一个reader monad，返回在新的环境中求值的这个reader monad. 我们在这里用它来暂时修改类型环境，并在修改之后的环境中对t类型进行泛化。对$t'$泛化之后，我们将$name:t'$加入到环境中，对$e_1$继续进行类型推导。这里$inEnv$函数的定义为：
+	\begin{lstlisting}[language=haskell]
+inEnv :: (Name, TypeScm) -> Infer a -> Infer a
+inEnv (v, t) m = do
+    let scope e = (remove e v) `extend` (v, t) 
+    local scope m
+	\end{lstlisting}
+	定义一个函数scope为接受一个环境e，将其内原有的name键值删去，并新添加当前绑定的类型。然后利用local函数，对当前环境应用scope函数并在新的环境中推导出$e_2$的类型。推导出$e_2$的类型后，利用writer monad的tell的函数记录下当前表达式的类型，并返回其结果即可。
+	\begin{lstlisting}[language=haskell]
+Lambda loc name e -> do 
+       a <- freshTyvar
+       (t, d, c) <- inEnv (name, TyForall [] (FpForall [] [] a)) 
+       			(infer e)
+       let tv = TyArr a t (fpSingleton loc)
+       tell [(loc, tv)]
+       return (tv, d, c)
+	\end{lstlisting}
+	对于$\lambda$表达式，我们首先新建一个类型变量a, 为了统一环境中类型，我们强制环境中的类型都是流属性类型模式的形式，即$\forall\vec{\alpha}.C\Rightarrow\forall\vec{X}.\kappa$. 在将参数和新建的流属性类型模式添加进环境中之后，在新的环境中对$e$进行类型推导，在记录当前子表达式的类型后直接返回结果类型即可。这里值得一提的是freshTyvar函数的实现, 它内部使用了一个函数叫做lettersTy：
+	\begin{lstlisting}[language=haskell]
+lettersTy :: [String]
+lettersTy = [1..] >>= flip replicateM ['a' .. 'z']
+	\end{lstlisting}
+	这里lettersTy使用了list monad，并利用replicateM对其进行无限次重复，由于haskell的惰性求值特性，最终编译器只会把我们需要的类型变量求值出放入列表中。lettersTy的结果是形如${a, b, \cdots, z, aa, ab, \cdots, az, ba, bb, \cdots, zz, aaa, aab\cdots}$无限长的列表，而这个函数如此简洁的实现更加体现了haskell这门语言高度的抽象能力和强大的表现力。
+	\subsection{错误处理}
+	众所周知，在实现程序静态分析的过程中，最为繁琐的缓解就是错误的处理。因为在静态分析过程中，错误的来源五花八门，可能来自分析算法自身的局限性, 甚至来自于用户不合法的输入。程序分析框架必须要识别出这些错误，并为用户提供友好的错误信息，甚至给出错误处理的建议。这给我们的实现带来了巨大的挑战。
+	
+	我项目中定义了一个类型用于表示各类错误：
+	\begin{lstlisting}[language=haskell]
+data TypeError 
+    = InfinitType String String
+    | UnificationFail Type Type
+    | UnboundVariables Name
+    | UnificationMismatch
+    | IncompatibleFPConstraints FP FP
+    | GenerateFPConstraintFail Type Type
+    | DecompositionFail Type
+	\end{lstlisting}
+	其中各个错误类型的代表的意义如下：
+	\begin{itemize}
+		\item \textbf{InfinitType} 如果将变量$\alpha$替换为$\kappa$， 但是同时$\alpha$也出现在了$\kappa$的自由变量中。此时这个替换可以无限次递归进行下去，形成一个递归的类型。由于我们的算法目前不支持递归类型，所以一旦检测出该情况，就会直接抛出一个InfinitType错误，并记录下参与替换的变量和类型作为错误信息打印给用户，方便用户修正代码。
+	\end{itemize}
 \end{document}
