@@ -10,7 +10,8 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{indentfirst}
-\usepackage{graphicx}   
+\usepackage{graphicx} 
+\usepackage{shorttoc}
 
 \setmainfont[Scale=1.08]{Charter}
 \setCJKmainfont[Scale=1.15]{STSong}
@@ -30,7 +31,7 @@
 }
 
 \lstdefinelanguage{Ocaml}{morekeywords={fun, let, in,if,then,else}}
-
+\renewcommand{\contentsname}{目录}
 \newtheorem{definition}{定义}
 \linespread{1.8}
 \setlength{\footskip}{60pt}
@@ -40,9 +41,28 @@
 
 \title{基于类型系统的Haskell控制流分析框架}
 \author{罗翔宇\\北京大学}
-
 \begin{document}
 	\maketitle
+	\renewcommand{\abstractname}{摘要}
+	\begin{abstract}
+	
+	程序的静态分析在现在软件开发的过程中扮演者越来越重要的角色，而控制流分析则是程序静态分析中最为关键基础的一个环节。对于控制流分析算法，有两个角度来衡量其优劣：精确度和运行时间。在实际的分析过程中这两者往往不能兼得，追求高的精确度意味着运行时间的增长，而在较短时间内得出的结果往往意味着不精确的分析结果。
+	
+	本控制流分析框架目标语言是有静态类型系统、惰性求值等特性的纯函数式语言Haskell。框架内部使用的算法基于Hindley-Milner类型系统，通过扩充原生类型系统的方式，运行于类型推导时期，渐进时间复杂度与类型推导时间复杂度相同，优于传统控制流分析算法，同时精确度不差于传统的分析算法。除此之外，该算法也具有求值顺序无关、模块化分析的特性，可适用于大型项目的控制流分析。本项目也可推广于所有使用Hindley-Milner的函数式编程语言。
+	\vfill
+	\noindent\textbf{关键词：} 控制流分析、类型系统、流属性
+	\end{abstract}
+	\renewcommand{\abstractname}{Abstract}
+	\begin{abstract}
+	
+	Nowadays static analysis of program is becoming increasingly significant in modern software development, and the control flow analysis is more fundamental compared to other analysis. To evaluate a control flow analysis algorithm, there are two aspects: accuracy and time. It's impossible to create an algorithm which is better at both them. A higher accuracy always leads to a long run time while the results obtained in a short time always is inaccurate.
+	
+	The control flow analysis framework in this thesis aims to Haskell, which is a well typed pure functional programming language with lazy evaluation. The internal algorithm used in this framework is basis of Hindley-Milner type system and runs at type inference time by extend the native type system. It has a better time complexity and give a result in no worse accuracy compared to ordinary control flow analysis algorithm. Besides, it's evaluation order independent and can analyze modularly. So it's proper to analyze complex and complicated project. The framework can also be extended to other languages which have Hindley-Milner type system.
+	\vfill
+	\noindent\textbf{Keywords:} Control Flow Analysis, Type System, Flow Property
+	\end{abstract}
+	\tableofcontents
+	\newpage
 	\section{背景介绍}
 	在实际软件工程项目的开发过程中，如果能够仅通过审查代码的方式（而非真正使用计算机运行程序）来获取程序的一些性质，从而进行漏洞排查、冗余代码移除或项目的其它优化，是一项非常有意义的事情。而这种只审查代码来推导程序性质的方式，就称之为程序的静态分析。由于其在项目开发中的重要作用，程序静态分析一直是软件工程研究领域的热点之一。
 	
@@ -59,7 +79,7 @@
 		\item \textbf{控制流分析算法的运行效率。}传统的基于抽象解释的控制流分析通常是模拟一个抽象解释器，在非确定性自动机上做推演规约。而这个推演规约过程的渐进时间复杂度是非多项式的，对于一些规模较大的程序，运行时间无法接受。除此之外，基于抽象解释的分析往往需要在编译器进行过类型检查之后，再次扫描整个程序并进行分析，无法很好的利用之前类型分析的结果，这也是时间效率低下的原因之一。
 		\item \textbf{控制流分析的模块化。}随着计算机技术的发展，实际的软件开发项目越来越庞大，代码也越来越复杂，模块化已经成为项目代码组织的基本原则之一。而基于抽象解释的分析却不能够很好的支持项目的模块化，即无法重用已有的代码的分析结果，如果某个代码片段稍作修改，有的项目都需要重新分析，这样就造成计算资源和时间的极大浪费。
 	\end{itemize}
-	Christian Mossin在他的论文中，提出了一个基于类型系统的函数式语言控制流分析，有效地解决了上文中现有控制流分析的种种问题。不过他的原始算法只适用于简单的静态类型$\lambda$演算，且最终结果分析的步骤过于繁琐。本文尝试将其算法扩展到了所有支持Hindley-Milner类型系统的编程语言，并包括let多态，函数参数类型重建以及代数数据结构等现代函数式语言必备的特性，除此之外，还优化了Christian的算法中分析结果的步骤，使得整个算法更加简洁。
+	Christian Mossin在他的论文中\cite{fp}，提出了一个基于类型系统的函数式语言控制流分析，有效地解决了上文中现有控制流分析的种种问题。不过他的原始算法只适用于简单的静态类型$\lambda$演算，且最终结果分析的步骤过于繁琐。本文尝试将其算法扩展到了所有支持Hindley-Milner类型系统的编程语言，并包括let多态，函数参数类型重建以及代数数据结构等现代函数式语言必备的特性，除此之外，还优化了Christian的算法中分析结果的步骤，使得整个算法更加简洁。
 	
 	为了进一步证明该算法的易用性，同时也为了改善函数式语言编程社区静态分析工具匮乏的现状，笔者尝试将以上优化的算法在Haskell语言上进行实现。
 	
@@ -110,7 +130,7 @@
 		\item $\mathrm{if}\ e\ \mathrm{then}\ e’\ \mathrm{else}\ e’’$ if条件语句，这里e的类型必须是Bool型，e’和e’’必须有相同的类型。
 		\item $\mathrm{True}, \mathrm{False}, \{0, 1, 2…\}$字面量，分别对应Bool真假常量和自然数。
 	\end{itemize}	
-在我们的编程语言中，定义如下的类型系统：	
+在我们的编程语言中，定义如下的类型系统\cite{Hindley}：	
 	\begin{mathparpagebreakable}
 		\inferrule{x:t \in A}{A\vdash x:t\mid \emptyset}\qquad \mathrm{Id}\and
 		\inferrule{\mathrm{X\ is\ a\ fresh\ type\ variable}\quad A, x:X\vdash e:T\mid C}{A\vdash\lambda x.e:X\to T\mid C}\qquad\mathrm{Abs}\and
@@ -132,7 +152,7 @@
 		\item\textbf{Fix} Fix即为$\lambda$演算中的不动点组合子，用来解决递归函数的情况。由于fix组合子的定义中，传入参数的类型实际上是和函数体的类型等价，所以直接在约束集合中添加约束$\{X_1 = X_2\}$即可。
 		\item\textbf{Tuple} 如果一个元组第一分量的类型是$T_1$，第二分量的类型是$T_2$，那么整个元组的类型即为$(T_1, T_2)$
 		\item\textbf{Tuple Deconstruct} 元组的模式匹配本质上是将元组的第一分量和第二分量都绑定到一个变量, 然后将绑定过后的变量添加进类型环境，最终在新的类型环境下推导出e的类型。
-		\item\textbf{Let} 为了实现let多态，我们不能简单地推导出t1 的类型并将x添加进类型环境中，而是应在e中将所有的x出现的地方替换为t1 后推导出e的类型。
+		\item\textbf{Let} \cite{Milner}为了实现let多态，我们不能简单地推导出t1 的类型并将x添加进类型环境中，而是应在e中将所有的x出现的地方替换为t1 后推导出e的类型。
 		\item\textbf{If} 首先需要保证用于条件判断的表达式e1是Bool类型，另外一个条件就是if语句的then分支和else分治的类型应当一致。所以将这两个约束添加进约束集合即可
 		\item\textbf{True, False, Int} 对于所有的字面量，直接返回该字面量对应的类型
 	\end{itemize}
@@ -292,7 +312,7 @@
 	
 	我们从一个特殊情况开始考虑：如果$G$中的边没有形成环，即$G$是一个有向无环图，是否有更优的算法。实际上，对于这种特殊情况，我们可以使用动态规划的算法解决。我们按照出度对图$G$进行拓扑排序，令$v_1, v_2, \cdots, v_n$是$G$的拓扑序列，即对于任意$v_i$，如果$(v_i, v_j) \in E$,　则必有$j < i$. 我们可以从前向后处理整个序列，对于当前的$v_i$, 找到其出边对应的所有$v_j$。由于是拓扑序列，$\mathcal{F}(v_j)$一定已经被计算出了，于是直接令$\mathcal{F}(v_i) = \bigcup\mathcal{F}(v_j),\quad\forall(v_i, v_j)\in E$ 即可。
 	
-	对于图$G$是一般图的情况，我们可以使用极大强连通分分量的算法进行解决。一个有向图$G = (V, E)$的一个强连通分量定义为$V$的一个子集$V'$使得对于任意$V'$中两个节点$v_i, v_j$，它们均可以互相到达。而一个极大强连通分量即为一个强连通分量$V'$，且对于任意$v'\in V - V'$, $V'\cup\{v'\}$都不是强连通分量。由于强连通分量的定义，我们可以发现对于属于同一强连通分量的中的两个节点$v_i$和$v_j$，必有$\mathcal{F}(v_i) = \mathcal{F}(v_j)$, 于是我们可以对于一个强连通分量，只计算一个$\mathcal{F}$即可. 对于有向图$G = (V, E)$, 我们可以使用Tarjan算法在线性时间内将$V$划分为若干个极大强连通分量的并集，即$V = V_1\cup V_2\cup \cdots\cup V_k$且$\forall i, j \in [1, k], i \not= j, V_i\cup V_j = \emptyset$. 求得极大强连通分量之后，我们构建新图$G' = (V', E')$, 其中$V' = \{V_1, V_2, \cdots, V_k\}$, $E' =  \{(V_i, V_j)\ \mid\ \exists v_i\in V_i\ \exists v_j\in V_j\ s.t.\ (v_i, v_j)\in E\}$, 容易发现$G'$是有向无环图（如果不然，可以将其环上的节点求并从而得到一个更大的强连通分量），于是可以套用上文中有向无环图的算法求得新图中每个节点的$\mathcal{F}$函数，然后原图中每个节点的$\mathcal{F}$值即为对应的极大强连通分量的$\mathcal{F}$值。Tarjan算法运行时间为线性，在有向无环图中求$\mathcal{F}$函数的时间复杂度也是线性，所以总的时间复杂度是线性。
+	对于图$G$是一般图的情况，我们可以使用极大强连通分分量的算法进行解决\cite{tarjan}。一个有向图$G = (V, E)$的一个强连通分量定义为$V$的一个子集$V'$使得对于任意$V'$中两个节点$v_i, v_j$，它们均可以互相到达。而一个极大强连通分量即为一个强连通分量$V'$，且对于任意$v'\in V - V'$, $V'\cup\{v'\}$都不是强连通分量。由于强连通分量的定义，我们可以发现对于属于同一强连通分量的中的两个节点$v_i$和$v_j$，必有$\mathcal{F}(v_i) = \mathcal{F}(v_j)$, 于是我们可以对于一个强连通分量，只计算一个$\mathcal{F}$即可. 对于有向图$G = (V, E)$, 我们可以使用Tarjan算法在线性时间内将$V$划分为若干个极大强连通分量的并集，即$V = V_1\cup V_2\cup \cdots\cup V_k$且$\forall i, j \in [1, k], i \not= j, V_i\cup V_j = \emptyset$. 求得极大强连通分量之后，我们构建新图$G' = (V', E')$, 其中$V' = \{V_1, V_2, \cdots, V_k\}$, $E' =  \{(V_i, V_j)\ \mid\ \exists v_i\in V_i\ \exists v_j\in V_j\ s.t.\ (v_i, v_j)\in E\}$, 容易发现$G'$是有向无环图（如果不然，可以将其环上的节点求并从而得到一个更大的强连通分量），于是可以套用上文中有向无环图的算法求得新图中每个节点的$\mathcal{F}$函数，然后原图中每个节点的$\mathcal{F}$值即为对应的极大强连通分量的$\mathcal{F}$值。Tarjan算法运行时间为线性，在有向无环图中求$\mathcal{F}$函数的时间复杂度也是线性，所以总的时间复杂度是线性。
 	
 	\subsection{算法总结}
 	给定待分析的表达式$e$，首先使用3.5章的类型推导规则推导出$e$的流属性类型$\kappa$，与此同时得到其类型约束集合$D$和子类型约束集合$C$。然后使用3.6中的算法求解类型约束集合，得到解$S$。将类型约束集合的解$S$应用到子类型约束集合$C$得到$C'$。接下来使用3.7中的算法将子类型约束集合转换为流属性约束集合$\mathcal{D}$, 再利用3.8中的算法求解流属性约束集合$\mathcal{D}$得到其解函数$\mathcal{F}$. 于是对于$e$中任意一子表达式$e'$，且$e'$有流属性类型$\kappa'$。那么$\ell = \mathcal{L}(\mathcal{F}(S(\kappa')))$就是$e'$的流属性，即$e'$最终可能求值结果的标号是$\ell$的一个子集。
@@ -317,7 +337,7 @@ class Substitutable var value contr | var -> value where
     	fv    :: contr -> Set.Set var
 	\end{lstlisting}
 	
-	这里Subst的定义为一个Data.Map.Map类型，即Subst a b为从类型a到类型b的替换。在Substitutable的声明中，var、value和contr分别为需要替换的变量类型、替换的结果类型以及需要应用替换的类型，注意到由替换的变量类型可以直接确定其替换的结果类型（即流属性变量只可能替换为流属性，类型变量只可能替换为类型），所以我们可以使用GHC的FunctionalDependencies扩展来提供更精确的的类型信息，简化后续实例的实现。
+	这里Subst的定义为一个Data.Map.Map类型，即Subst a b为从类型a到类型b的替换。在Substitutable的声明中，var、value和contr分别为需要替换的变量类型、替换的结果类型以及需要应用替换的类型，注意到由替换的变量类型可以直接确定其替换的结果类型（即流属性变量只可能替换为流属性，类型变量只可能替换为类型），所以我们可以使用GHC的FunctionalDependencies扩展\cite{fundep}来提供更精确的的类型信息，简化后续实例的实现。
 	
 	而整个推导算法的主体由一个函数infer实现，其中infer的类型签名为:
 	\begin{lstlisting}[language=haskell]
@@ -374,13 +394,48 @@ data TypeError
     = InfinitType String String
     | UnificationFail Type Type
     | UnboundVariables Name
-    | UnificationMismatch
-    | IncompatibleFPConstraints FP FP
     | GenerateFPConstraintFail Type Type
-    | DecompositionFail Type
+    | IncompatibleFPConstraints FP FP
 	\end{lstlisting}
 	其中各个错误类型的代表的意义如下：
 	\begin{itemize}
 		\item \textbf{InfinitType} 如果将变量$\alpha$替换为$\kappa$， 但是同时$\alpha$也出现在了$\kappa$的自由变量中。此时这个替换可以无限次递归进行下去，形成一个递归的类型。由于我们的算法目前不支持递归类型，所以一旦检测出该情况，就会直接抛出一个InfinitType错误，并记录下参与替换的变量和类型作为错误信息打印给用户，方便用户修正代码。
+		\item \textbf{UnificationFail} 在unify算法运行过程出现类型不匹配的错误，例如调用unify算法的两个参数一个是Int类型另外是Bool类型，这种情况下此类型约束集合就不存在解。我们一旦检测到这种情况就直接抛出UnificationFail异常并记录unify算法中不匹配的两个变量。
+		\item \textbf{UnboundVariables} 在类型推导过程中如遇到一个变量未在环境中出现，则抛出UnboundVariables异常，并记录该变量名称方便用户排查。
+		\item \textbf{GenerateFPConstraintFail}  在对子类型约束集合进行求解的过程中，如果遇到类型不匹配的情况，则直接抛出GenerateFPConstraintFail异常，并记录下不匹配的两个流属性类型。例如$Bool^{\alpha}\preceq Int^{\beta}$，这里无论$\alpha$和$\beta$取什么值都不可能使得$Bool^{\alpha}$是$Int^{\beta}$的子类型，故抛出GenerateFPConstraintFail异常。
+		\item \textbf{IncompatibleFPConstraints} 在求解流属性约束集合的过程中，如果遇到流属性不匹配的情况，则直接抛出IncompatibleFPConstraints异常并记录下不匹配的流属性。例如$\ell_1\subseteq\ell_2$，这里$\ell_1=\{l_1, l_2\}, \ell_2 = \{l_1, l_3\}$，此时直接抛出$IncompatibleFPConstraints$即可。
 	\end{itemize}
+	\newpage
+	\section{试验评估}
+	待填坑
+	\newpage
+	\section{总结与未来展望}
+	\subsection{总结}
+	本项目通过扩展Hindley-Milner类型系统，定义了一种基于标号和流属性的类型系统，实现了对于静态类型系统的在程序编译时期进行控制流分析的工作。本算法相比于传统的控制流分析算法，具有求值顺序无关、时间效率高以及可模块化等优点，适用于大型项目的控制流分析。本算法可以通过形式化证明证明其正确性，也可以用对于正确性要求较高的项目中。除此之外，该算法的可扩展性强，可以用于所有基于Hindley-Milner类型系统的编程语言，如Haskell, Ocaml等。
+	
+	在Haskell上对于本算法的实现为Haskell社区提供了一个简单易用的控制流分析框架。本项目由良好的API接口，用户可以直接使用其对自己的Haskell项目进行控制流分析，或者作为一个库包含进自己的项目，利用控制流分析的中间结果进行后续的静态分析。
+	\subsection{相关工作}
+	像Ocaml, Haskell等函数编程语言由于强大的抽象能力和表达力所带来的陡峭的学习曲线、较高的入门门槛，目前在互联网公司中仍未大规模使用，相关的编程工具仍处于一个相对匮乏的状态。例如Haskell语言上的语义层面的控制流分析项目目前仍是一片空白。虽然在学术界，函数式语言控制流分析已经有很多优秀的算法，如kCFA等，但是由于没有商业利益的推动，所以业界目前没有人将其实现为可用的库。
+	
+	不过函数式语言由于其可靠性和易扩展性，在金融领域受到了青睐，目前有很多金融公司都将其作为主力开发语言开发交易系统，量化交易模型等。使用函数式语言进行开发的金融公司内部有一大批专业人员进行函数式语言的理论研究和内部工具的开发，不过这些理论和工具往往不对外界公开。例如美国的金融公司Jane Street，其交易系统主要使用Ocaml语言开发。Jane Street公司内部有专业的研究人员研究基于Ocaml的程序静态分析理论，并自行开发了一套Ocaml工具链，其中就包括功能强大的Ocaml静态分析程序，不过这些工具并不公开，所以外界的开发人员并不能使用这些工具帮助自己项目的开发。
+	\subsection{局限与未来}
+	本项目可以在一定程度上对Haskell语言进行控制流分析，但是由于Haskell的类型系统不是完全的Hindley-Milner类型系统，而包括诸如kind高阶类型、GADT等更复杂的类型特性，故目前可以成功分析的只有Haskell的一个子集。同时本算法目前不支持递归类型，这也一定程度上阻碍了它向更复杂的类型系统的扩展。
+	
+	因此在未来的工作中，我们可以考虑从递归类型和高阶类型角度扩展该算法，能够处理更加复杂的类型系统，从而将项目推广到整个Haskell语言。此外，对于有静态类型系统但是非函数式语言的控制流分析也是一个比较有潜力的方向，比如目前在C++, Scala上的控制流分析都没有从类型系统角度来进行算法设计，我们可以将我们的算法推广到这些语言上，从而得到更快更精确的结果。另外本算法中流属性概念不仅可以用于进行控制流分析，也可以辅助类型推导，比如在有子类型的编程语言中，利用流属性概念就可以得到更为精确的子类型推导结果。总之，未来的研究会朝着表达能力更加强大的流属性类型系统的方向发展、更加通用的分析框架。
+	\newpage
+	\section{参考文献}
+	\begin{thebibliography}{1}
+		\bibitem{fp} C. Mossin {\em "Flow Analysis of Typed Higher-Order Programs"} . In:cs.ucla.edu. 1997, pp. 19-58. 85-97.
+		\bibitem{tarjan} Tarjan, R. E. {\em  "Depth-first search and linear graph algorithms"}. In:SIAM Journal on Computing 1 (2). 1972, pp. 146–160
+		\bibitem{Hindley} Hindley, J. Roger {\em "The Principal Type-Scheme of an Object in Combinatory Logic"}. In: Transactions of the American Mathematical Society 146, pp. 29–60
+		\bibitem{Milner} Milner, Robin {\em "A Theory of Type Polymorphism in Programming"}. In:Journal of Computer and System Science (JCSS) 17, pp. 348–374
+		\bibitem{fundep} Hallgren, T.  {\em "Fun with Functional Dependencies or Types as Values in Static Computations in Haskell"}. In:Proceedings of the Joint CS/CE Winter Meeting (Varberg, Sweden) Jan. 2011
+	\end{thebibliography}
+	\newpage
+	\section{致谢}
+	在研究过程中，非常感谢熊英飞老师的悉心指导，我们在研究过程中进行了很多的讨论和设计，熊老师给我提了很多具有建设性的意见。
+	
+	此外我还要感谢辛苦的答辩评委们进行阅读并提出宝贵的意见，没有你们这篇论文也失去了写作的意义，感谢各位能够让我们的研究得到一个良好的总结。
+	
+	最后感谢父母，同学，学院，学校对我们科学研究开展的支持以及对于良好环境的提供。
 \end{document}
