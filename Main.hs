@@ -1,25 +1,54 @@
 import Text.Groom
 import Debug.Trace
 
-import Syntax 
+import Control.Monad
+
+import System.Environment
+
+import qualified Data.Set as Set
+import qualified Data.Text.Lazy.IO as L
+
+import Text.Parsec.Pos
+
+import Data
+import Syntax
+import Parser
 import Infer
 
-expr1 = App 1 (Lambda 2 "x" 
-                (App 3 
-                   (Var 4 "x") 
-                   (Lit 5 (LBool True))))
-             (If 6 (Lit 7 (LBool True)) 
-                   (Lambda 8 "y" (Var 9 "y")) 
-                   (Lambda 10 "z" (Var 11 "z")))
+main = do
+    filename <- liftM head $  getArgs
+    program <- L.readFile filename
+    case parseExpr program of
+        Left err ->
+            putStrLn $ "[Parse Error]: " ++ (groom err)
+        Right expr -> 
+            case Infer.inferExpr expr of
+                Left err -> 
+                    putStrLn $ "[Infer Error]: " ++ (groom err)
+                Right (ty, tp) -> prettyPrintTypedProg tp
 
-expr2 = Let 1 "id" (Lambda 2 "x" 
-                        (If 3 (Var 4 "x") (Var 5 "x") (Var 6 "x")))
-                   (App 7 (Var 8 "id") (Lit 9 (LBool True)))
+prettyPrintPos pos = do
+    let (line, column) = (sourceLine pos, sourceColumn pos)
+    putStr "("
+    putStr $ show line
+    putStr ","
+    putStr $ show column
+    putStr ")"
 
-main = case Infer.inferExpr expr2 of
-    Left err -> 
-        putStrLn $ "[Error]: " ++ (groom err)
-    Right (ty, tp) -> do 
-        putStrLn $ "Type: " ++ (groom ty)
-        putStrLn $ "TypedProgram: " ++ (groom tp)
+prettyPrintSrcLoc (SrcLoc start end) = do
+   putStr "["
+   prettyPrintPos start
+   putStr ","
+   prettyPrintPos end
+   putStr "]"
 
+prettyPrintTypedProg :: [TypedProgram] -> IO ()
+prettyPrintTypedProg [] = return ()
+prettyPrintTypedProg (x:xs) = do
+    let (srcLoc, ty) = x
+    prettyPrintSrcLoc srcLoc
+    putStr " -> "
+    let (FPSet fpSet) = ty2fp ty 
+    mapM_ (\(Label srcLoc) -> prettyPrintSrcLoc srcLoc >> putStr ", ") (Set.toList fpSet)
+    putStrLn ""
+    prettyPrintTypedProg xs

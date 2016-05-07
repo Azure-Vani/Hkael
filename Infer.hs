@@ -143,7 +143,7 @@ infer expr = case expr of
         tell [(loc, t)]
         return (t, (tv, t):d, (t, tv):c)
 
-    Op loc op e1 e2 -> do
+    Op op e1 e2 -> do
         (t1, d1, c1) <- infer e1
         (t2, d2, c2) <- infer e2
         l <- freshFpvar

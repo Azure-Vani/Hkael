@@ -1,8 +1,11 @@
 module Syntax where
 
+import Text.Parsec.Pos
+
 type Name = String
 
-type SrcLoc = Int
+data SrcLoc = SrcLoc SourcePos SourcePos
+    deriving (Show, Eq, Ord)
 
 data Expr
     = Lit SrcLoc Lit
@@ -12,7 +15,7 @@ data Expr
     | Let SrcLoc Name Expr Expr
     | If SrcLoc Expr Expr Expr
     | Fix SrcLoc Name Expr
-    | Op SrcLoc Binop Expr Expr
+    | Op Binop Expr Expr
     deriving (Show, Eq, Ord)
 
 data Lit
