@@ -20,3 +20,7 @@ log
 
 test.hs
 Main
+*.out
+*.log
+*.synctex.gv
+*.toc

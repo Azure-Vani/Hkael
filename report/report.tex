@@ -1,10 +1,9 @@
-\documentclass[12pt, titlepage]{article}
+\documentclass[UTF8, colorlinks]{pkuthss}
 
-\usepackage[boldfont]{xeCJK}
 \usepackage{mathtools}
 \usepackage{amsmath, amssymb, amsthm}
 \usepackage{mathpartir}
-\usepackage[left=2.5cm, right=2.5cm,bottom=5cm]{geometry}
+%\usepackage{backend = biber, style = caspervector, utf8, sorting = none]{biblatex}
 \usepackage{syntax}
 \usepackage{lstautogobble}
 \usepackage{listings}
@@ -13,17 +12,26 @@
 \usepackage{graphicx} 
 \usepackage{shorttoc}
 
-\setmainfont[Scale=1.08]{Charter}
-\setCJKmainfont[Scale=1.15]{STSong}
-\setCJKfamilyfont{kai}{Kaiti SC}
+\pkuthssinfo{
+	cthesisname = {本科生毕业论文}, ethesisname = {Undergraduate Thesis},
+	ctitle = {基于Hindley-Milner类型系统的控制流分析算法}, etitle = {A control flow analysis algorithm based on Hindley-Milner type system},
+	cauthor = {罗翔宇},
+	eauthor = {Luo Xiangyu},
+	studentid = {1200012779},
+	date = {2016.05.09},
+	school={北京大学},
+	cmajor = {信息科学技术学院}, emajor = {Computer Science},
+	direction = {计算机方向},
+	cmentor = {熊英飞}, ementor = {Prof.\ Yingfei Xiong},
+	ckeywords = {控制流分析，Hindley-Milner类型系统，流属性}, ekeywords = {Control Flow Analysis, Hindley-Milner Type System, Flow Property}
+}
 
 \newfontfamily\listingsfont{PT Mono}
-
 \lstset{
 	numbers = left,
 	numberstyle=\footnotesize,
 	xleftmargin=2em, xrightmargin=2em,aboveskip=2em,tabsize=4,
-	basicstyle=\listingsfont\linespread{0.1},	
+	basicstyle=\listingsfont\linespread{0.15},	
 	frame=tb,
 	keywordstyle=\bfseries\color{blue},
 	commentstyle=\itshape\color{gray},
@@ -31,68 +39,113 @@
 }
 
 \lstdefinelanguage{Ocaml}{morekeywords={fun, let, in,if,then,else}}
-\renewcommand{\contentsname}{目录}
 \newtheorem{definition}{定义}
-\linespread{1.8}
-\setlength{\footskip}{60pt}
 
 \newcommand{\xto}{\xrightarrow}
 \let\emptyset\varnothing
 
-\title{基于类型系统的Haskell控制流分析框架}
+\title{基于Hindley-Milner类型系统的控制流分析框架}
 \author{罗翔宇\\北京大学}
 \begin{document}
+	\frontmatter
 	\maketitle
-	\renewcommand{\abstractname}{摘要}
-	\begin{abstract}
+	
+	\include{copyright}
+	
+	\begin{cabstract}
 	
 	程序的静态分析在现在软件开发的过程中扮演者越来越重要的角色，而控制流分析则是程序静态分析中最为关键基础的一个环节。对于控制流分析算法，有两个角度来衡量其优劣：精确度和运行时间。在实际的分析过程中这两者往往不能兼得，追求高的精确度意味着运行时间的增长，而在较短时间内得出的结果往往意味着不精确的分析结果。
 	
-	本控制流分析框架目标语言是有静态类型系统、惰性求值等特性的纯函数式语言Haskell。框架内部使用的算法基于Hindley-Milner类型系统，通过扩充原生类型系统的方式，运行于类型推导时期，渐进时间复杂度与类型推导时间复杂度相同，优于传统控制流分析算法，同时精确度不差于传统的分析算法。除此之外，该算法也具有求值顺序无关、模块化分析的特性，可适用于大型项目的控制流分析。本项目也可推广于所有使用Hindley-Milner的函数式编程语言。
-	\vfill
-	\noindent\textbf{关键词：} 控制流分析、类型系统、流属性
-	\end{abstract}
-	\renewcommand{\abstractname}{Abstract}
-	\begin{abstract}
+	Hindley-Milner类型系统被广泛应用于函数式编程语言中，但是由于其复杂的参数重建、多态等特性，目前的基于类型的控制流分析都不能很好地应用于Hindley-Milner类型系统中，而传统的基于抽象解释的控制流分析又有着求值顺序相关、效率低下等缺点。本文提出的Hindley-Milner类型系统的控制流分析算法可以很好地运行于Hindley-Milner类型系统之上，而且可以在编译器的类型推导时完成分析，不需要多次扫描程序。除此之外，本文还在Haskell语言的子集上实现了该算法，提供了用户友好的编程接口，可以直接用于IDE开发等实际项目中。
+	\end{cabstract}
 	
-	Nowadays static analysis of program is becoming increasingly significant in modern software development, and the control flow analysis is more fundamental compared to other analysis. To evaluate a control flow analysis algorithm, there are two aspects: accuracy and time. It's impossible to create an algorithm which is better at both them. A higher accuracy always leads to a long run time while the results obtained in a short time always is inaccurate.
+	\begin{eabstract}
 	
-	The control flow analysis framework in this thesis aims to Haskell, which is a well typed pure functional programming language with lazy evaluation. The internal algorithm used in this framework is basis of Hindley-Milner type system and runs at type inference time by extend the native type system. It has a better time complexity and give a result in no worse accuracy compared to ordinary control flow analysis algorithm. Besides, it's evaluation order independent and can analyze modularly. So it's proper to analyze complex and complicated project. The framework can also be extended to other languages which have Hindley-Milner type system.
-	\vfill
-	\noindent\textbf{Keywords:} Control Flow Analysis, Type System, Flow Property
-	\end{abstract}
+	Nowadays static analysis of program is becoming increasingly significant in modern software development, and the control flow analysis is more fundamental compared to other analysis. To evaluate a control flow analysis algorithm, there are two aspects: accuracy and efficiency. It's impossible to come up with an algorithm which is better at both them. A higher accuracy always leads to a long run time while the results obtained in a short time always is inaccurate.
+	
+ 	The Hindley-Milner type system is widely used in functional programming, but the existing control flow analysis algorithm based on type system is not suitable for Hindley-Milner type system due to its parameters reconstruction, polymorphism features. And the traditional control flow analysis based on abstract interpretation is evaluation order dependent and inefficiency. The algorithm in this thesis can be used in Hindley-Milner type system while it runs with type inference and only needs to pass through source code one time. Besides, the implementation of the algorithm can runs on a subset of Haskell providing a user friendly interface and benefits IDE development.
+	\end{eabstract}
 	\tableofcontents
-	\newpage
-	\section{背景介绍}
+	\mainmatter
+	
+	\specialchap{背景介绍}
 	在实际软件工程项目的开发过程中，如果能够仅通过审查代码的方式（而非真正使用计算机运行程序）来获取程序的一些性质，从而进行漏洞排查、冗余代码移除或项目的其它优化，是一项非常有意义的事情。而这种只审查代码来推导程序性质的方式，就称之为程序的静态分析。由于其在项目开发中的重要作用，程序静态分析一直是软件工程研究领域的热点之一。
 	
-	近些年来，基于$\lambda$演算的函数式编程语言逐渐开始流行开来。函数式编程语言相对于传统的命令式编程语言，更加强调程序执行的结果而非程序执行的过程，倡导利用若干简单的执行单元让计算结果不断渐进，逐层推导复杂的运算，而不是设计一个复杂的执行过程。因此，函数式语言更加抽象，表达能力更为强大，同时也为在函数式语言上做程序静态分析带来了更大的挑战。
+	近些年来，基于$\lambda$演算的带有静态类型系统的函数式编程语言逐渐开始流行开来。函数式编程语言相对于传统的命令式编程语言，更加强调程序执行的结果而非程序执行的过程，倡导利用若干简单的执行单元让计算结果不断渐进，逐层推导复杂的运算，而不是设计一个复杂的执行过程。此外，语言中带有的静态类型系统也强化了编译器在编译期程序检查的功能，使得大部分程序漏洞可以在编译时期而不是实际运行时发现。静态类型的函数式编程语的高度抽象化、强大的表现力以及复杂的类型系统和语义定义，为在其上进行程序的静态分析带来了巨大的挑战。
+	
+	在众多函数式编程语言的类型系统中，使用最为广泛的就是由J. Roger Hindley最先提出\cite{Hindley}、后来经由Robin Milner改进\cite{Milner}的Hindley-Milner类型系统，目前主流的函数式编程语言，诸如Haskell、Ocaml等都采用了Hindley-Milner类型系统。在Hindley-Milner类型中，编程人员可以不用声明任何类型声明和类型提示，而由类型推导算法推导出所有变量的类型。同时在使用该类型系统中的语言中，所有的let语句绑定的$\lambda$函数都默认是一个多态函数，即可应用于不同的类型参数，同时根据输入参数而返回不同类型的返回值。let多态增加了Hindley-Milner类型系统的抽象能力，使得编程人员免于重复编写功能类似、只是参数类型不同的函数。
 	
 	一般情况下，函数式编程语言上的程序静态分析通常以控制流分析为主，即确定每一个函数的调用目标，同时控制流分析也是函数式编程语言上其他的静态分析的基础。举一个例子，考虑如下程序片段：
 	\begin{lstlisting}[language=Ocaml]
   let f = fun g -> g True
   in f (fun x -> if x then False else True)
 	\end{lstlisting}
-	通过控制流分析，我们可以知道调用f时对应的目标为在let 绑定语句中的$\mathrm{fun}\ \mathrm{g} \to \mathrm{g}\ \mathrm{True}$。一旦有了函数的调用目标的结果，我们就可以执行后续的程序切片、数据依赖等分析。事实上，为了解决函数式语言的控制流分析，程序分析的研究学者们已经提出了若干优秀的算法，比如基于抽象解释的kCFA算法。虽然已有的算法能够在相对可以接受的时间内给出较为精确的结果，但是在实际应用中也有一定的局限性，主要体现在以下方面：
-	\begin{itemize}
-		\item \textbf{函数式语言的求值顺序。}对于函数式语言的控制流分析，一个不可忽视的问题是求值顺序对于分析结果的影响。求值顺序在普通的命令式编程语言中通常可以直接在控制流分析的结果中体现出来，这是因为命令式语言的求值顺序就是编程人员字面书写的代码语句的顺序，但是在传统函数式编程的研究中，lambda 演算的求值语义往往定义为beta规约，这种规约并没有指定求值的顺序，不同的编译器有不同的实现方式，通常有按值调用、按名字调用和按需求调用等。除此之外，编译器在编译时期基于beta分析进行的编译优化或是程序的并行执行，都会影响控制流分析的结果。而基于抽象解释的控制流分析技术，往往需要针对不同的求值顺序的实现而做相应的更改，没有很好的通用性。
-		\item \textbf{控制流分析算法的运行效率。}传统的基于抽象解释的控制流分析通常是模拟一个抽象解释器，在非确定性自动机上做推演规约。而这个推演规约过程的渐进时间复杂度是非多项式的，对于一些规模较大的程序，运行时间无法接受。除此之外，基于抽象解释的分析往往需要在编译器进行过类型检查之后，再次扫描整个程序并进行分析，无法很好的利用之前类型分析的结果，这也是时间效率低下的原因之一。
-		\item \textbf{控制流分析的模块化。}随着计算机技术的发展，实际的软件开发项目越来越庞大，代码也越来越复杂，模块化已经成为项目代码组织的基本原则之一。而基于抽象解释的分析却不能够很好的支持项目的模块化，即无法重用已有的代码的分析结果，如果某个代码片段稍作修改，有的项目都需要重新分析，这样就造成计算资源和时间的极大浪费。
-	\end{itemize}
-	Christian Mossin在他的论文中\cite{fp}，提出了一个基于类型系统的函数式语言控制流分析，有效地解决了上文中现有控制流分析的种种问题。不过他的原始算法只适用于简单的静态类型$\lambda$演算，且最终结果分析的步骤过于繁琐。本文尝试将其算法扩展到了所有支持Hindley-Milner类型系统的编程语言，并包括let多态，函数参数类型重建以及代数数据结构等现代函数式语言必备的特性，除此之外，还优化了Christian的算法中分析结果的步骤，使得整个算法更加简洁。
+	通过控制流分析，我们可以知道调用f时对应的目标为在let 绑定语句中的$\mathrm{fun}\ \mathrm{g} \to \mathrm{g}\ \mathrm{True}$。一旦有了函数的调用目标的结果，我们就可以执行后续的程序切片、数据依赖等分析。
 	
-	为了进一步证明该算法的易用性，同时也为了改善函数式语言编程社区静态分析工具匮乏的现状，笔者尝试将以上优化的算法在Haskell语言上进行实现。
-	
-	Haskell语言作为函数式编程语言的代表，拥有一个基于Hindley-Milner类型推论的静态强类型系统，同时支持惰性求值、模式匹配、列表解析和类型多态等特性。Haskell的这些复杂的特性为在其上进行控制流分析带来了巨大的挑战。到目前为止，Haskell语言上的静态分析工具依然十分稀少，并且现有的工具的分析结果都不尽人意。其中一个例子是已经广泛使用的SourceGraph工具，它的控制流分析结果是非常粗糙的。比如考虑如下代码片段：
-	\begin{lstlisting}[language=haskell]
-	f x = x 3
-	g y = f (\t -> t + y)
-	\end{lstlisting}
-	SourceGraph只能推断出g函数依赖于f函数，却无法准确地分析出f函数的的定义里$\mathrm{x\ 3}$的函数调用依赖于$\mathrm{\\t -> t + y}$的定义，即SourceGraph的控制流分析结果只停留在词法层面，而非语义层面的分析，这样的精准度对于实际应用是远远不够的。Haskell语言上另外一个控制流分析框架是shivers-cfg，但是它的开发目前已经停滞，而且根据文档的介绍，现有的代码只是对Shivers算法简单的实现，甚至没有为用户提供API接口，所以目前还无法测试其精准度。
+	事实上，为了解决函数式语言的控制流分析，程序分析的研究学者们已经提出了许多优秀的算法	。Shivers在他的论文中提出基于抽象解释的1-CFA算法\cite{Shivers}，但是该算法只是针对通用的无类型$\lambda$演算，没有利用静态类型系统的信息进行优化，同时该算法需要在运行时进行抽象解释，依赖于语言的求值顺序，也降低了算法的运行效率。而Mossin在他的论文中提出的基于类型系统的控制流分析算法只支持简单的带类型的$\lambda$演算，支持的类型系统的特性非常有限，像Hindley-Milner类型系统中的参数重建和let多态等都不能很好地处理。
 
-	\newpage	
-	\section{语言定义}
-	出于方便起见，我们首先定义自己的一个带有Hindley-Milner类型系统的简单编程语言。为了更好地揭露算法的本质，避免无关紧要的细节对于读者理解算法的影响，我们希望这个语言的语法尽可能简洁，同时又能保留静态类型系统、多态等特性。注意本章的语言仅用于说明算法，真正的代码在Haskell语言上实现。
+	设计基于Hindley-Milner类型系统的控制流分析算法，相比于简单的带类型$\lambda$演算的控制流算法，有以下几个难点：
+	\begin{itemize}
+		\item \textbf{参数的重建之前无法获取类型系统信息。}由于Hindley-Milner类型系统中所有的函数参数都没有类型信息，我们需要在类型推导的过程中维护一个类型约束集合，在推导过程结束之后求解该类型约束集合，再根据约束集合的解替换掉类型变量后才能获取每一个参数的真实类型。而控制流分析过程依赖于每一个参数的类型，在参数重建之前我们是无法得知变量的类型信息的，从而无法在类型推导的同时进行控制流分析。
+		\item \textbf{let多态导致的流属性变量多态以及约束集合指数爆炸。}基于类型系统的控制流分析往往基于修改现有类型系统，为其添加流属性来维护控制流信息。但是let绑定的变量由于其多态性，可以应用于不同的参数，这就要求我们的流变量也要至少支持同样的多态。同时由于流属性的多态不能使用类似类型多态的主类型来表示，所以每一个let绑定的变量的类型中都会保存当前let的绑定语句中的流属性变量约束集合，而这些集合随着let的嵌套会呈现指数级增长。
+		\item \textbf{let多态中流变量的实例化。}由于let多态的存在，很多类型的流属性都是以变量的形式来保存的，这就需要我们找到所有应用该类型的位置，但是这就需要在类型推导过程结束之后，再次扫描整个程序来实例化所有多态的流属性变量，降低了分析的效率
+	\end{itemize}
+	
+	本文基于Mossin的简单类型系统的控制流分析算法，将其推广到了Hindley-Milner类型系统，完美地解决了上述三个问题，并在Haskell语言的子集中进行了实现。 在接下来的章节中，我们会先具体说明我们控制流分析的目标并且简单概述如何解决在Hindley-Milner类型中解决上述问题（第二章），然后形式化定义一个分析的语言用于本论文的算法阐述（第二章），接着形式化描述我们的分析算法（第三章），并给算法在Haskell的子集上的实现细节（第四章），最后给出算法在不同数据集下的分析结果（第五章）。
+
+	
+	\chapter{算法简介}
+	\section{控制流分析目标}
+	对于一个静态类型系统的函数式编程语言，一般用语法定义、类型推导规则和求值规则来描述。其中类型推导规则描述在给定类型系统下，对于一个源程序，如何推导出每一个子表达和变量的类型。而求值规则则描述在给定的求值规则下，如何将一个表达式转化成一个值。在函数式编程语言中，值一般指函数。
+	
+	我们的控制流分析的目标即为对于源程序中的每一个函数调用，确定其调用的目标，即对于形如$e_1\ e_2$的函数调用，确定表达式$e_1$最终求值的结果。本文的中的算法不仅适用于函数调用的表达式，还可以用于语言中其他的表达式，即对于源程序中任意表达式，控制流分析可以推导出其最终可能的求值结果的集合。
+	
+	比如对于程序:
+	\begin{lstlisting}[language=Ocaml]
+	let f x = if x then fun x -> x + 1 
+			  else fun x -> x - 1 
+	in (f True) 1
+	\end{lstlisting}
+	我们所期望的控制流分析结果为: 表达式(f True)最终可能被求值为fun x -> x + 1或者fun x -> x - 1，表达式(f True) 1最终可能被求值为1 + 1或者1 - 1, 这里我们定义+和-为语言中的元函数，其语义不在求值规则中。
+	\section{算法思路}
+	我们的算法基于扩展原生的Hindley-Milner类型系统，使得每一个类型都绑定一个称之为流属性的元素，其中流属性是一个值的集合，表示拥有该类型的表达式最终可能的求值结果集合。
+	
+	在类型推导的过程中，我们需要根据表达式，对其子表达式的流属性做某些集合的操作或者对其加以集合的约束，以更新其流属性。考虑代码：
+	\begin{lstlisting}[language=Ocaml]
+	if x then e1 else e2
+	\end{lstlisting}
+	这里表达式if x then e1 else e2的类型中的流属性就是表达式e1和e2类型中的流属性的并集。而考虑代码：
+	\begin{lstlisting}[language=Ocaml]
+	(fun x -> x 1) (fun y -> y + 1) 
+	\end{lstlisting}
+	这里表达式x 1中x类型中的流属性就应该是(fun y -> y + 1)类型中的流属性的超集，因为(fun x -> x + 1)可能不止在这里进行调用，所以需要包含所有其可能的参数的类型中的流属性。
+	
+	于是我们可以在原有的Hindley-Milner类型系统基础上，添加子类型系统。一个类型A是另外一个类型B的子类型当且仅当A除去所有的流属性之后和B除去流属性的类型相同，且A中的流属性是B的流属性的子集。有了子类型系统之后，我们就可以沿用传统的子类型推导算法，而不用考虑流属性的集合关系了。比如对于函数调用$e_1\ e_2$，其中$e_1$有类型$t_1\to t_2$，$e_2$有类型$t_3$，我们只需要保证$t_3$是$t_1$的子类型就可以了。这样我们基于流属性的类型系统就和传统的子类型系统一致。
+	
+	但是对于Hindley-Milner类型系统，所有的函数参数的定义都没有类型标识，即在类型推导过程中是无法得知参数的真实类型的。所以我们需要模仿类型变量，引入流属性变量，然后为所有没有类型信息的参数分配一个流属性变量。同时在推导过程中需要维护一个子类型约束集合，用于建立流属性变量之间的约束条件。在类型推导结束之后，现对于Hindley-Milner类型推导算法中类型变量的约束集合求解，把所有的类型变量替换为真实类型，然后再将子类型约束集合重新转化为流属性之间集合的关系，最后求解这些集合关系方程并把所有的流属性变量替换为流属性即可。比如考虑代码
+	\begin{lstlisting}[language=Ocaml]
+		(fun x -> if True then False else x)
+	\end{lstlisting}
+	这里我们不知道参数x的类型和流属性，也不知道(fun x -> if True then False else x)的类型。于是可以新建类型变量$\alpha$和$\beta$，令x为类型$\alpha$，(fun x -> if True then False else x)为类型$\alpha\to\beta$。同时新建流属性变量$\kappa_1$和$\kappa_2$，令$\kappa_1$是$\alpha$绑定的流属性，$\kappa_2$是$\beta$绑定的流属性。由前面的子类型系统的定义可知，False是$\beta$的子类型，且$\alpha$也是$\beta$的子类型，于是可以将其添加到子类型约束集合中。在类型推导过程结束之后转换为$\kappa_1$是$\kappa_2$的子集，且False所代表的流属性也是$\kappa_2$的子集。这样就成功地将类型重建过程缺失的流属性信息，转化为一系列的流属性变量和这些流属性变量之间的集合关系。我们只需要求解这些集合关系即可，求解流属性集合关系所用的算法会在后文详细描述。
+	
+	对于let多态的问题，Hindley-Milner解决的方式为先对let绑定的表达式进行类型推导，求解出其一个形如$\forall X.X\to X$的主类型和一个类型约束集合$S$，然后对于类型约束集合$S$进行求解，并根据$S$的解把当前类型推导环境中的类型变量先进行替换，然后再替换过的环境中继续进行类型推导。当在环境中查询变量时，如果遇变量有形如$\forall X.X\to X$的主类型，我们需要先使用一些未出现过的类型变量将主类型中的约束类型变量替换掉并去掉这些约束变量，再将替换后的类型返回。这样就可以实现let多态。
+	
+	但是对于流属性的多态，我们并不能这么照搬Hindley-Milner类型系统的方案，这是因为流属性的约束都是形如$\kappa_1\subseteq \kappa_2$的子集约束，和Hindley-Milner类型系统中的$X = Y\to Z$的等价约束不同，子集约束不可以部分求解。考虑约束$\{1, 2\}\subseteq \kappa$，如果只看这一条约束，我们可以解出$\kappa = \{1, 2\}$，但是如果后续又添加了一个约束$\{3\} \subseteq \kappa$，那么其实正确的解应当是$\kappa = \{1, 2, 3\}$，如果我们部分求解，在后面就会导出$\{3\} \subseteq \{1, 2\}$的矛盾。
+	
+	我们这里采取的方法是对于所有的流属性多态类型，我们不仅创建一个流属性变量来表示主流属性类型，同时也将推导出的子类型约束集合放在类型中，构造成形如$\forall\kappa. C\Rightarrow T$的形式，其中$\kappa$使我们构造的流属性变量，$C$是子类型约束集合中，$T$是真实的类型，其含义为对于所有满足约束$C$的流属性变量$\ell$，其表达式有类型$T[\kappa/\ell]$，即将$T$所有自由出现的$\kappa$替换为$\ell$. 而每次在环境中查询一个变量的类型的时候，则需要将所有的约束流属性变量替换为全新的流属性变量，并将约束集合$C$中的流属性变量也替换为新的流属性变量，然后把的得到的新的子类型约束集合中和当前约束集合合并。
+	
+	但是这样会造成一个问题，如果let语句嵌套的层数过多，会使得每一层的let都创造一个带有约束集合的流属性类型，这样就造成很多约束在不同的约束集合中重复出现，从而造成空间的极大浪费。这里可以使用的一个优化是：我们可以发现很多约束其实是可以合并的，比如如果有两个约束为$\{\ell_1\subseteq \kappa, \ell_2\subseteq \kappa\}$, 那么其实可以将其合并为$\{\ell_1\cup \ell_2 \subseteq \kappa\}$, 另外如果一个流属性变量在类型中没有自由出现，那么其实关于它的约束是没有用的，因为它在以后也不会被替换，那么我们就可以简单地去掉这些约束。经过如上处理之后，每一个流属性变量最多只会在一个约束集合中出现一次，所以约束的个数最多只有平方级别的个数。
+	
+	由于流属性变量的存在，let绑定的表达式的类型实际上是包含流属性变量的。比如考虑程序：
+	\begin{lstlisting}[language=Ocaml]
+	let f = fun x -> if x then False else True 
+	in (f True, f False)
+	\end{lstlisting}
+	这里经过类型推导，可以得到if x then False else True中x的类型实际上是$Bool^\kappa$，其中$\kappa$是一个流属性变量。而由于在约束中的流属性变量在后续的推导过程会进行实例化，所有添加进约束集合的流属性变量实际上不是$\kappa$，而是一个新的流属性变量$\kappa'$。为了解决这个问题，我们需要在构造子类型约束集合的时使用一些技巧，使得可以正确处理这个情况。详细会在第三章描述。
+	
+		
+	\chapter{语言定义}
+	出于方便起见，我们首先定义自己的一个带有Hindley-Milner类型系统的简单编程语言。为了更好地揭露算法的本质，避免无关紧要的细节对于读者理解算法的影响，我们希望这个语言的语法尽可能简洁，同时又能保留静态类型系统、多态等特性。注意本章的语言仅用于说明算法，真正的代码在Haskell的一个子集上实现。
 	
 	首先令$V$是一个可列举的变量集合，同时令$x, y, z$为$V$中的元素。一个程序即为如下一个表达式：
 	\setlength{\grammarindent}{8em} % increase separation between LHS/RHS 
@@ -157,14 +210,14 @@
 		\item\textbf{True, False, Int} 对于所有的字面量，直接返回该字面量对应的类型
 	\end{itemize}
 
-\newpage
-\section{算法框架}
+
+\chapter{算法的形式化描述}
 有了语法和类型系统的定义之后，我们接下来就可以形式化地定义在该语言上的控制流分析。
-\subsection{标号和流属性}
+\section{标号和流属性}
 	令$V$为一个无穷可列集合，对于任意$V$中元素$l$，称$l$为一个标号。 定义一个标号集合$\ell$为流属性，即$\ell\subset V$. 对于任意一个表达式$e$, 为$e$中所有形如$\lambda x.e$, $True$, $False$, $\{1, 2, 3,\cdots\}$的子表达式分配一个独一无二的标号。如表达式$$\mathrm{if}\ True\ \mathrm{then}\ \lambda x.x\ \mathrm{else}\ \lambda y.0$$分配过标号之后为$$\mathrm{if}\ True^{l_1}\ \mathrm{then}\ \lambda^{l_2} x.x\ \mathrm{else}\ \lambda^{l_3} y.0^{l_4}$$
-\subsection{流属性变量和流属性约束}
+\section{流属性变量和流属性约束}
 我们定义形如$\alpha, \beta, \gamma$的变量为一个流属性变量，可以指代任一流属性。 一个流属性约束为形如$\alpha\subset\beta$ 的约束，表示$\alpha$ 是$\beta$ 的子集。我们用C来代指一个流属性约束组成的集合。
-\subsection{流属性类型}
+\section{流属性类型}
 我们基于Hindey-Milner类型系统定义如下流属性类型：
 	\begin{mathpar}
 		\inferrule{\kappa\in\mathcal{K}(t)\quad\kappa'\in\mathcal{K}(t')}{\kappa\xto{\ell}\kappa'\in\mathcal{K}(t\to t')}\qquad\mathrm{Arrow}\and
@@ -184,7 +237,7 @@
 	\end{align*}
 	
 	对于形如$\forall\vec{\alpha}.C\Rightarrow\forall\vec{X}.\kappa$的流属性类型，我们称其为一个流属性类型模式，其中C为一个约束集合，$\vec{\alpha}$是一系列的流属性变量，$\vec{X}$为一系列类型变量。$\forall\vec{\alpha}.C\Rightarrow\forall\vec{X}\kappa$的意义是一个表达式对于所有使得C成立的流属性$\vec{l}$，有类型$\forall\vec{X}.\kappa[\vec{\alpha}/\vec{l}]$，即将$\kappa$中所有的$\vec{\alpha}$替换为$\vec{l}$。我们用$\tau$来表示流属性模式， $\mathcal{S}(t)$是一个流属性类型模式集合。
-\subsection{流属性类型的子类型关系}
+\section{流属性类型的子类型关系}
 对于流属性类型，我们有如下流属性子类型关系：
 	\begin{mathpar}
 		\inferrule{\ell_1\subseteq\ell_2}{\mathrm{Bool}^{\ell_1}\preceq\mathrm{Bool}^{\ell_2}}\qquad \mathrm{Sub Bool}\and
@@ -192,7 +245,7 @@
 		\inferrule{\kappa_1\preceq\kappa_1'\quad\kappa_2\preceq\kappa_2'\quad\ell_1\subseteq\ell_2}{\kappa_1'\xto{\ell_1}\kappa_2\preceq\kappa_1\xto{\ell_2}\kappa_2'}\qquad\mathrm{Sub Arrow}\and
 		\inferrule{\kappa_1\preceq\kappa_1'\quad\kappa_2\preceq\kappa_2'\quad\ell_1\subseteq\ell_2}{(\kappa_1,\kappa_2)^{\ell_1}\preceq(\kappa_1', \kappa_2')^{\ell_2}}\qquad\mathrm{Sub Tuple}
 	\end{mathpar}
-\subsection{流属性类型系统}
+\section{流属性类型系统}
 	\begin{definition}[替换]
 		对于任意流属性类型$\kappa$，定义$\kappa[\vec{\alpha}/\vec{l}\,]$为将$\kappa$中出现的所有流属性变量$\vec{\alpha}$替换为$\vec{l}$，定义$\kappa[\vec{X}/\vec{T}\,]$为将$\kappa$中出现的所有类型变量$\vec{X}$替换为$\vec{T}$
 	\end{definition}
@@ -263,7 +316,7 @@
 	\item \textbf{Let} 为了实现多态，Let的规则比较复杂。首先在环境$A$中推导出$e$表达式的流属性类型$\kappa$以及相对应的类型约束集合$D$和子类型约束集合$C$。注意我们不能直接把推导$e$时得出的类型约束集合并入最终答案中，因为$e$的类型都是多态类型，即其中的类型变量会在以后实例化成新的类型变量，所以我们需要在这里直接求解类型约束集合$D$并将其解$S$应用到当前环境$A$和后续的类型推导中。但是由于子类型约束集合不能部分求解，所以需要在泛化后的流属性类型模式中绑定上子类型约束的集合，即形如$\forall\vec{\alpha}.C\Rightarrow\forall\vec{X}.\kappa$的流属性类型模板。而$e$的类型多态只体现在$\kappa$中自由类型变量和自由流属性变量中，所以只需为其添加约束并在后续使用的位置进行实例化即可。
 	\end{itemize}
 	
-	\subsection{求解类型约束集合}
+	\section{求解类型约束集合}
 	在这里我们使用联合算法求解类型约束集合，其中$unify$函数接受一个类型约束集合$D$并返回其一个解$S$。该算法的伪代码描述如下：
 	\begin{lstlisting}[escapeinside={`}{`}]
 	unify(D) = if C is empty then id
@@ -278,7 +331,7 @@
 	\end{lstlisting}
 	注意基于流属性的类型系统不支持递归类型，所以如果检测到变量$X$应该替换为$\kappa$且$X$在$\kappa$中自由出现则会直接报错。
 	
-	\subsection{求解子类型约束集合}
+	\section{求解子类型约束集合}
 	对于一个形如$\{\kappa_1\preceq\kappa_2, \kappa_3\preceq\kappa_4\cdots\}$子类型约束集合$C$, 我们首先需要将其转化为形如$\{\ell_1\subseteq\ell_2, \ell_3\subseteq\ell_4\cdots\}$的流属性约束集合，转换的算法伪代码描述如下：
 	\begin{lstlisting}[escapeinside={`}{`}]
 	trans(D) = if D is empty then `$\emptyset$`
@@ -300,7 +353,7 @@
 		subset(\ell, \ell') &= fail&\text{if}\quad \ell\not\subseteq\ell'\\
 		subset(\alpha, \ell) &= fail
 	\end{align*}
-	\subsection{求解流属性约束集合}
+	\section{求解流属性约束集合}
 	一个形如$\mathcal{D} = \{\alpha\subseteq\beta, \ell\subseteq\gamma, \cdots\}$的集合被称为流属性约束集合，其中每一条约束$\alpha\subseteq\beta$的含义为流属性$\alpha$是$\beta$的真子集。我们希望找到一个从流属性变量映射到流属性的函数$\mathcal{F}$，使得对于所有的约束$\alpha\subseteq\beta$都有$\mathcal{F}(\alpha)\subseteq\mathcal{F}(\beta)$. 
 	
 	为了求解流属性约束集合，我们可以将其抽象为一个图论问题。构建有向图$G = (V, E)$，其中$V$为流属性约束集合$\mathcal{D}$中所有出现的流属性变量，$E = \{(\beta, \alpha)\ \mid\ \{\alpha\subseteq\beta\}\subseteq\mathcal{D}\}$. 	有向图$G$中一条边$(\alpha, \beta)$的含义为，流属性变量$\beta$所代表的流属性是$\alpha$所代表的流属性的子集。同时定义从$V$映射到流属性的函数$\mathcal{H}$:
@@ -314,11 +367,42 @@
 	
 	对于图$G$是一般图的情况，我们可以使用极大强连通分分量的算法进行解决\cite{tarjan}。一个有向图$G = (V, E)$的一个强连通分量定义为$V$的一个子集$V'$使得对于任意$V'$中两个节点$v_i, v_j$，它们均可以互相到达。而一个极大强连通分量即为一个强连通分量$V'$，且对于任意$v'\in V - V'$, $V'\cup\{v'\}$都不是强连通分量。由于强连通分量的定义，我们可以发现对于属于同一强连通分量的中的两个节点$v_i$和$v_j$，必有$\mathcal{F}(v_i) = \mathcal{F}(v_j)$, 于是我们可以对于一个强连通分量，只计算一个$\mathcal{F}$即可. 对于有向图$G = (V, E)$, 我们可以使用Tarjan算法在线性时间内将$V$划分为若干个极大强连通分量的并集，即$V = V_1\cup V_2\cup \cdots\cup V_k$且$\forall i, j \in [1, k], i \not= j, V_i\cup V_j = \emptyset$. 求得极大强连通分量之后，我们构建新图$G' = (V', E')$, 其中$V' = \{V_1, V_2, \cdots, V_k\}$, $E' =  \{(V_i, V_j)\ \mid\ \exists v_i\in V_i\ \exists v_j\in V_j\ s.t.\ (v_i, v_j)\in E\}$, 容易发现$G'$是有向无环图（如果不然，可以将其环上的节点求并从而得到一个更大的强连通分量），于是可以套用上文中有向无环图的算法求得新图中每个节点的$\mathcal{F}$函数，然后原图中每个节点的$\mathcal{F}$值即为对应的极大强连通分量的$\mathcal{F}$值。Tarjan算法运行时间为线性，在有向无环图中求$\mathcal{F}$函数的时间复杂度也是线性，所以总的时间复杂度是线性。
 	
-	\subsection{算法总结}
-	给定待分析的表达式$e$，首先使用3.5章的类型推导规则推导出$e$的流属性类型$\kappa$，与此同时得到其类型约束集合$D$和子类型约束集合$C$。然后使用3.6中的算法求解类型约束集合，得到解$S$。将类型约束集合的解$S$应用到子类型约束集合$C$得到$C'$。接下来使用3.7中的算法将子类型约束集合转换为流属性约束集合$\mathcal{D}$, 再利用3.8中的算法求解流属性约束集合$\mathcal{D}$得到其解函数$\mathcal{F}$. 于是对于$e$中任意一子表达式$e'$，且$e'$有流属性类型$\kappa'$。那么$\ell = \mathcal{L}(\mathcal{F}(S(\kappa')))$就是$e'$的流属性，即$e'$最终可能求值结果的标号是$\ell$的一个子集。
-	\newpage
-	\section{实现细节}
-	\subsection{类型定义}
+	\section{流属性约束集合的优化}
+	再次审视let规则，我们会发现如果let嵌套层数过多，流属性类型模板中的约束集合的中约束个数就呈指数级增长：
+	\begin{lstlisting}[escapeinside={`}{`}]
+	let x0 = e in
+		let x1 = `$\lambda$.`y if y then x0 else x0  in
+			let x2 = `$\lambda$.`z if z then x1 else x1 in
+				...
+	\end{lstlisting}
+	这里考虑所有最外层的let绑定，不妨类型推导$e$时返回了子类型约束集合$C_0$，因为x0的多态性，我们可以发现x1的约束集合$C_1$中会包含$C_0$的两个拷贝，同理由于x1的多态性，x2的约束集合$C_2$中含有$C_1$的两个拷贝，即$C_0$的四个拷贝。如此下去，我们可以发现约束集合的中约束的个数是随着let的嵌套层数指数增长的。
+	
+	为了限制其约束集合的增长，我们必须去除约束集合中的一些无用约束, 这里无用的约束由以下两种组成：
+	\begin{itemize}
+		\item 如果约束集合中存在$\{\ell_1\subseteq \alpha, \ell_2\subseteq \alpha\}$的约束，可以将其合并为$\{\ell_1\cup\ell_2 \subseteq \alpha\}$. 
+		\item 如果约束集合中存在$\{\ell_1 \subseteq \alpha, \ell_2 \subseteq \alpha, \alpha\subseteq \beta\}$，且$\alpha$在表达式无自由出现，那么可以将其合并为$\{\ell_1\cup\ell_2\subseteq\beta\}$
+	\end{itemize}
+	
+	经过如此合并之后，可以发现约束集合中不同的流属性变量个数最多为待分析的表达式中出现的自由变量的个数，故最多约束个数的级别为$O(n^2)$
+	
+	\section{let绑定中流属性变量的实例化}
+	由于流属性类型模板的实例化，导致最终加入到子类型约束集合中的流属性变量是实例化之后的新的流属性变量，而原有的let绑定中的流属性变量并没有被添加进约束集合。
+	考虑程序:
+	\begin{lstlisting}{escapeinside={`}{`}}
+		let f = `$\lambda$`x. if x then False else True
+		in (f True, f False)
+	\end{lstlisting}
+	这里如果在f的定义中，x分配的流属性变量是$\alpha$，那么它在后续调用f的时候就会被实例化为$\beta$和$\gamma$（实例化的流属性变量总是被替换为全新的流属性变量）。这样如果我们需要询问if语句中x的流属性，就会得到一个流属性变量$\alpha$而不是一个真实的流属性。
+	
+	事实上，为了解决这个问题，我们需要在类型分析之后，再次扫描整个程序追踪所有f的调用，并将传入的参数的流属性求并集，作为x的流属性。但是这样不仅需要多次扫描程序，降低分析效率，而且算法较为繁琐，不易实现。
+	
+	这里我们可以使用一个技巧，即如果将$\alpha$流属性变量实例化为$\beta$流属性变量的时候，可以在子类型约束集合中添加一条约束：$\beta\preceq\alpha$，然后我们就正常求解所有的约束集合并执行替换操作。由于此类型的存在，$\alpha$就会被自动替换为$\beta$和其余所有调用的参数的流属性的并集，从而得到正确的流属性结果。
+	
+	\section{算法总结}
+	给定待分析的表达式$e$，首先使用4.5章的类型推导规则推导出$e$的流属性类型$\kappa$，与此同时得到其类型约束集合$D$和子类型约束集合$C$。然后使用4.6中的算法求解类型约束集合，得到解$S$。将类型约束集合的解$S$应用到子类型约束集合$C$得到$C'$。接下来使用4.7中的算法将子类型约束集合转换为流属性约束集合$\mathcal{D}$, 再利用4.8中的算法求解流属性约束集合$\mathcal{D}$得到其解函数$\mathcal{F}$. 于是对于$e$中任意一子表达式$e'$，且$e'$有流属性类型$\kappa'$。那么$\ell = \mathcal{L}(\mathcal{F}(S(\kappa')))$就是$e'$的流属性，即$e'$最终可能求值结果的标号是$\ell$的一个子集。 注意在子类型约束集合构造和求解的构造过程中，使用4.9和4.10中提到的优化，优化实现并提高分析的效率。
+	
+	\chapter{实现细节}
+	\section{类型定义}
 	本框架使用Haskell实现。其核心数据结构使用如下定义：
 	\begin{lstlisting}[language=haskell]
 type Infer a = (RWST
@@ -344,7 +428,7 @@ class Substitutable var value contr | var -> value where
 infer :: Expr -> Infer (Type, [TConstraint], [FConstraint])
 	\end{lstlisting}
 	infer函数接受一个expr类型的输入，返回一个Infer monad，其中monad的结果为该表达式类型, 类型约束集合与子类型约束集合的三元组。由上文Infer monad的定义我们知道，这其中也包含了输入表达式中所有子表达式的类型、类型推导错误信息等其他信息。
-	\subsection{类型推导实现}
+	\section{类型推导实现}
 	由于Haskell提供的简洁又强大的Monad编程范式，类型推导的实现异常简单，我们只以相对复杂的$Let$和$\lambda$规则作为说明。
 	\begin{lstlisting}[language=haskell]
 Let loc name e1 e2 -> do
@@ -385,7 +469,7 @@ lettersTy :: [String]
 lettersTy = [1..] >>= flip replicateM ['a' .. 'z']
 	\end{lstlisting}
 	这里lettersTy使用了list monad，并利用replicateM对其进行无限次重复，由于haskell的惰性求值特性，最终编译器只会把我们需要的类型变量求值出放入列表中。lettersTy的结果是形如${a, b, \cdots, z, aa, ab, \cdots, az, ba, bb, \cdots, zz, aaa, aab\cdots}$无限长的列表，而这个函数如此简洁的实现更加体现了haskell这门语言高度的抽象能力和强大的表现力。
-	\subsection{错误处理}
+	\section{错误处理}
 	众所周知，在实现程序静态分析的过程中，最为繁琐的缓解就是错误的处理。因为在静态分析过程中，错误的来源五花八门，可能来自分析算法自身的局限性, 甚至来自于用户不合法的输入。程序分析框架必须要识别出这些错误，并为用户提供友好的错误信息，甚至给出错误处理的建议。这给我们的实现带来了巨大的挑战。
 	
 	我项目中定义了一个类型用于表示各类错误：
@@ -405,37 +489,39 @@ data TypeError
 		\item \textbf{GenerateFPConstraintFail}  在对子类型约束集合进行求解的过程中，如果遇到类型不匹配的情况，则直接抛出GenerateFPConstraintFail异常，并记录下不匹配的两个流属性类型。例如$Bool^{\alpha}\preceq Int^{\beta}$，这里无论$\alpha$和$\beta$取什么值都不可能使得$Bool^{\alpha}$是$Int^{\beta}$的子类型，故抛出GenerateFPConstraintFail异常。
 		\item \textbf{IncompatibleFPConstraints} 在求解流属性约束集合的过程中，如果遇到流属性不匹配的情况，则直接抛出IncompatibleFPConstraints异常并记录下不匹配的流属性。例如$\ell_1\subseteq\ell_2$，这里$\ell_1=\{l_1, l_2\}, \ell_2 = \{l_1, l_3\}$，此时直接抛出$IncompatibleFPConstraints$即可。
 	\end{itemize}
-	\newpage
-	\section{试验评估}
+	
+	\chapter{试验评估}
 	待填坑
-	\newpage
-	\section{总结与未来展望}
-	\subsection{总结}
+	
+	\specialchap{总结与未来展望}
+	\section{总结}
 	本项目通过扩展Hindley-Milner类型系统，定义了一种基于标号和流属性的类型系统，实现了对于静态类型系统的在程序编译时期进行控制流分析的工作。本算法相比于传统的控制流分析算法，具有求值顺序无关、时间效率高以及可模块化等优点，适用于大型项目的控制流分析。本算法可以通过形式化证明证明其正确性，也可以用对于正确性要求较高的项目中。除此之外，该算法的可扩展性强，可以用于所有基于Hindley-Milner类型系统的编程语言，如Haskell, Ocaml等。
 	
 	在Haskell上对于本算法的实现为Haskell社区提供了一个简单易用的控制流分析框架。本项目由良好的API接口，用户可以直接使用其对自己的Haskell项目进行控制流分析，或者作为一个库包含进自己的项目，利用控制流分析的中间结果进行后续的静态分析。
-	\subsection{相关工作}
+	\section{相关工作}
 	像Ocaml, Haskell等函数编程语言由于强大的抽象能力和表达力所带来的陡峭的学习曲线、较高的入门门槛，目前在互联网公司中仍未大规模使用，相关的编程工具仍处于一个相对匮乏的状态。例如Haskell语言上的语义层面的控制流分析项目目前仍是一片空白。虽然在学术界，函数式语言控制流分析已经有很多优秀的算法，如kCFA等，但是由于没有商业利益的推动，所以业界目前没有人将其实现为可用的库。
 	
 	不过函数式语言由于其可靠性和易扩展性，在金融领域受到了青睐，目前有很多金融公司都将其作为主力开发语言开发交易系统，量化交易模型等。使用函数式语言进行开发的金融公司内部有一大批专业人员进行函数式语言的理论研究和内部工具的开发，不过这些理论和工具往往不对外界公开。例如美国的金融公司Jane Street，其交易系统主要使用Ocaml语言开发。Jane Street公司内部有专业的研究人员研究基于Ocaml的程序静态分析理论，并自行开发了一套Ocaml工具链，其中就包括功能强大的Ocaml静态分析程序，不过这些工具并不公开，所以外界的开发人员并不能使用这些工具帮助自己项目的开发。
-	\subsection{局限与未来}
+	\section{局限与未来}
 	本项目可以在一定程度上对Haskell语言进行控制流分析，但是由于Haskell的类型系统不是完全的Hindley-Milner类型系统，而包括诸如kind高阶类型、GADT等更复杂的类型特性，故目前可以成功分析的只有Haskell的一个子集。同时本算法目前不支持递归类型，这也一定程度上阻碍了它向更复杂的类型系统的扩展。
 	
 	因此在未来的工作中，我们可以考虑从递归类型和高阶类型角度扩展该算法，能够处理更加复杂的类型系统，从而将项目推广到整个Haskell语言。此外，对于有静态类型系统但是非函数式语言的控制流分析也是一个比较有潜力的方向，比如目前在C++, Scala上的控制流分析都没有从类型系统角度来进行算法设计，我们可以将我们的算法推广到这些语言上，从而得到更快更精确的结果。另外本算法中流属性概念不仅可以用于进行控制流分析，也可以辅助类型推导，比如在有子类型的编程语言中，利用流属性概念就可以得到更为精确的子类型推导结果。总之，未来的研究会朝着表达能力更加强大的流属性类型系统的方向发展、更加通用的分析框架。
-	\newpage
-	\section{参考文献}
+	
 	\begin{thebibliography}{1}
 		\bibitem{fp} C. Mossin {\em "Flow Analysis of Typed Higher-Order Programs"} . In:cs.ucla.edu. 1997, pp. 19-58. 85-97.
+		\bibitem{Shivers} Shivers, Olin. {\em "Control-flow analysis of higher-order languages"}. Diss. Carnegie Mellon University Pittsburgh, PA, 1991.
 		\bibitem{tarjan} Tarjan, R. E. {\em  "Depth-first search and linear graph algorithms"}. In:SIAM Journal on Computing 1 (2). 1972, pp. 146–160
 		\bibitem{Hindley} Hindley, J. Roger {\em "The Principal Type-Scheme of an Object in Combinatory Logic"}. In: Transactions of the American Mathematical Society 146, pp. 29–60
 		\bibitem{Milner} Milner, Robin {\em "A Theory of Type Polymorphism in Programming"}. In:Journal of Computer and System Science (JCSS) 17, pp. 348–374
 		\bibitem{fundep} Hallgren, T.  {\em "Fun with Functional Dependencies or Types as Values in Static Computations in Haskell"}. In:Proceedings of the Joint CS/CE Winter Meeting (Varberg, Sweden) Jan. 2011
 	\end{thebibliography}
-	\newpage
-	\section{致谢}
+	
+	\backmatter
+	\chapter{致谢}
 	在研究过程中，非常感谢熊英飞老师的悉心指导，我们在研究过程中进行了很多的讨论和设计，熊老师给我提了很多具有建设性的意见。
 	
 	此外我还要感谢辛苦的答辩评委们进行阅读并提出宝贵的意见，没有你们这篇论文也失去了写作的意义，感谢各位能够让我们的研究得到一个良好的总结。
 	
 	最后感谢父母，同学，学院，学校对我们科学研究开展的支持以及对于良好环境的提供。
+	\include{originauth}
 \end{document}
