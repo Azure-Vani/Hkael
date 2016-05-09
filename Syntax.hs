@@ -15,7 +15,7 @@ data Expr
     | Let SrcLoc Name Expr Expr
     | If SrcLoc Expr Expr Expr
     | Fix SrcLoc Name Expr
-    | Op Binop Expr Expr
+    | Op Binop SrcLoc Expr Expr
     deriving (Show, Eq, Ord)
 
 data Lit

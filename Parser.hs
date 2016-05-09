@@ -90,8 +90,9 @@ aexp =
 term :: Parser Expr
 term = Ex.buildExpressionParser table aexp
 
-infixOp :: String -> (a -> a -> a) -> Ex.Assoc -> Op a
-infixOp x f = Ex.Infix (reservedOp x >> return f)
+infixOp :: String -> (SrcLoc -> a -> a -> a) -> Ex.Assoc -> Op a
+infixOp x f = Ex.Infix $ 
+    withPosParser (reservedOp x) >>= (\(_, srcLoc) -> return $ f srcLoc)
 
 table :: Operators Expr
 table = [

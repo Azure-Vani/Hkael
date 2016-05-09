@@ -143,15 +143,16 @@ infer expr = case expr of
         tell [(loc, t)]
         return (t, (tv, t):d, (t, tv):c)
 
-    Op op e1 e2 -> do
+    Op op loc e1 e2 -> do
         (t1, d1, c1) <- infer e1
         (t2, d2, c2) <- infer e2
-        l <- freshFpvar
+        let fp = fpSingleton loc
         let (d, tv) = case op of 
-                Add -> ([(t1, typeInt l), (t2, typeInt l)], typeInt l)
-                Sub -> ([(t1, typeInt l), (t2, typeInt l)], typeInt l)
-                Mul -> ([(t1, typeInt l), (t2, typeInt l)], typeInt l)
-                Eql -> ([(t1, typeInt l), (t2, typeInt l)], typeBool l)
+                Add -> ([(t1, typeInt fp), (t2, typeInt fp)], typeInt fp)
+                Sub -> ([(t1, typeInt fp), (t2, typeInt fp)], typeInt fp)
+                Mul -> ([(t1, typeInt fp), (t2, typeInt fp)], typeInt fp)
+                Eql -> ([(t1, typeInt fp), (t2, typeInt fp)], typeBool fp)
+        tell [(loc, tv)]
         return (tv, d1 ++ d2 ++ d, c1 ++ c2)
 
 -- Run
