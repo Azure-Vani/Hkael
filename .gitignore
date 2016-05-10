@@ -22,5 +22,6 @@ test.hs
 Main
 *.out
 *.log
-*.synctex.gv
+*.synctex.gz
+*.pdf
 *.toc
