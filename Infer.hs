@@ -83,6 +83,32 @@ inEnv (v, t) m = do
     let scope e = (remove e v) `extend` (v, t) 
     local scope m
 
+changeFpVar :: Type -> Infer Type
+changeFpVar (TyCon x _) = do
+    fp <- freshFpvar
+    return $ TyCon x fp
+
+changeFpVar (TyArr t1 t2 _) = do
+    t1' <- changeFpVar t1
+    t2' <- changeFpVar t2
+    fp' <- freshFpvar 
+    return $ TyArr t1' t2' fp'
+
+changeFpVar (TyApp t1 t2 _) = do
+    t1' <- changeFpVar t1
+    t2' <- changeFpVar t2
+    fp' <- freshFpvar 
+    return $ TyApp t1' t2' fp'
+
+changeFpVar (TyVar var _) = do
+    fp' <- freshFpvar 
+    return $ TyVar var fp'
+
+evalSub sub = do
+    s' <- mapM (\(key, value) -> changeFpVar value >>= return . (,) key) (Map.toList s)
+    return $ Subst $ Map.fromList s'
+    where Subst s = sub
+
 infer :: Expr -> Infer (Type, [TConstraint], [FConstraint])
 infer expr = case expr of
     Lit loc (LInt _) -> do
@@ -120,11 +146,12 @@ infer expr = case expr of
         (t, d, c) <- infer e1
         case runSolve d of
             Left error -> throwError error
-            Right sub -> do
+            Right sub' -> do
+                sub <- evalSub sub'
                 t' <- local (apply sub) generalize t c
                 (tv, d', c') <- inEnv (name, t') $ local (apply sub) (infer e2)
                 tell [(loc, tv)]
-                return (tv, d' ++ d, c' ++ c)
+                return (tv, d' ++ (apply sub d), c' ++ (apply sub c))
     
     If loc e1 e2 e3 -> do
         t  <- freshTyvar
@@ -165,8 +192,11 @@ runInfer env m = runExcept $ evalRWST m env initInfer
 inferExpr :: Expr -> Either TypeError (Type, [TypedProgram])
 inferExpr expr = do
     let initEnv = emptyEnv
-    ((ty, d, c), typedProgram) <- runInfer initEnv (infer expr)
-    sub <- Constraint.runSolve d
+    ((ty, sub, c), typedProgram) <- 
+        runInfer initEnv (infer expr >>= \(ty, d, c) -> 
+            case Constraint.runSolve d of
+                Left err -> throwError err
+                Right sub -> evalSub sub >>= \sub -> return (ty, sub, c))
     let c' = apply sub c
     relation <- Constraint.runGen c'
     let fpsub = Constraint.accumulate relation

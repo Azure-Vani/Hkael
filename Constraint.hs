@@ -153,16 +153,16 @@ unifyMany (x:xs) (y:ys) = do
     return $ s2 `compose` s1
 unifyMany _ _ = throwError $ UnificationMismatch
 
-runSolve :: [TConstraint] -> Either TypeError (Subst TVar Type)
-runSolve cs = runTypeErrorM $ solver st
-    where st = (emptySubst, cs)
-
 solver :: (Subst TVar Type, [TConstraint]) -> Solve (Subst TVar Type)
 solver (su, cs) = case cs of
     [] -> return su
     (t1,t2):xs -> do 
         s <- unify t1 t2
         solver (s `compose` su, apply s xs)
+
+runSolve :: [TConstraint] -> Either TypeError (Subst TVar Type)
+runSolve cs = runTypeErrorM $ solver st
+    where st = (emptySubst, cs)
 
 -- Solve flow properties constraints
 
