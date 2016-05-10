@@ -83,30 +83,46 @@ inEnv (v, t) m = do
     let scope e = (remove e v) `extend` (v, t) 
     local scope m
 
-changeFpVar :: Type -> Infer Type
-changeFpVar (TyCon x _) = do
+changeFpVar_ :: Type -> Infer Type
+changeFpVar_ (TyCon x _) = do
     fp <- freshFpvar
     return $ TyCon x fp
 
-changeFpVar (TyArr t1 t2 _) = do
+changeFpVar_ (TyArr t1 t2 _) = do
     t1' <- changeFpVar t1
     t2' <- changeFpVar t2
     fp' <- freshFpvar 
     return $ TyArr t1' t2' fp'
 
-changeFpVar (TyApp t1 t2 _) = do
+changeFpVar_ (TyApp t1 t2 _) = do
     t1' <- changeFpVar t1
     t2' <- changeFpVar t2
     fp' <- freshFpvar 
     return $ TyApp t1' t2' fp'
 
-changeFpVar (TyVar var _) = do
+changeFpVar_ (TyVar var fp) = do
     fp' <- freshFpvar 
     return $ TyVar var fp'
 
+changeFpVar :: Type -> Infer Type
+changeFpVar all@(TyCon x _) = return all
+
+changeFpVar (TyArr t1 t2 fp) = do
+    t1' <- changeFpVar_ t1
+    t2' <- changeFpVar_ t2
+    return $ TyArr t1' t2' fp
+
+changeFpVar (TyApp t1 t2 fp) = do
+    t1' <- changeFpVar_ t1
+    t2' <- changeFpVar_ t2
+    return $ TyApp t1' t2' fp
+
+changeFpVar all@(TyVar var fp) = return all
+
 evalSub sub = do
-    s' <- mapM (\(key, value) -> changeFpVar value >>= return . (,) key) (Map.toList s)
-    return $ Subst $ Map.fromList s'
+    let slist = Map.toList s
+    s'list <- mapM (\(key, value) -> changeFpVar value >>= return . (,) key) slist
+    return $ Subst $ Map.fromList s'list
     where Subst s = sub
 
 infer :: Expr -> Infer (Type, [TConstraint], [FConstraint])
@@ -151,7 +167,7 @@ infer expr = case expr of
                 t' <- local (apply sub) generalize t c
                 (tv, d', c') <- inEnv (name, t') $ local (apply sub) (infer e2)
                 tell [(loc, tv)]
-                return (tv, d' ++ (apply sub d), c' ++ (apply sub c))
+                return (tv, d', c')
     
     If loc e1 e2 e3 -> do
         t  <- freshTyvar

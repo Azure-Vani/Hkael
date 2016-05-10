@@ -25,7 +25,9 @@ main = do
             case Infer.inferExpr expr of
                 Left err -> 
                     putStrLn $ "[Infer Error]: " ++ (groom err)
-                Right (ty, tp) -> prettyPrintTypedProg tp
+                Right (ty, tp) ->  do
+                    putStrLn (show (length tp))
+                    trace (groom tp) (prettyPrintTypedProg tp)
 
 prettyPrintPos pos = do
     let (line, column) = (sourceLine pos, sourceColumn pos)
@@ -48,7 +50,9 @@ prettyPrintTypedProg (x:xs) = do
     let (srcLoc, ty) = x
     prettyPrintSrcLoc srcLoc
     putStr " -> "
-    let (FPSet fpSet) = ty2fp ty 
-    mapM_ (\(Label srcLoc) -> prettyPrintSrcLoc srcLoc >> putStr ", ") (Set.toList fpSet)
-    putStrLn ""
-    prettyPrintTypedProg xs
+    case ty2fp ty of
+        FPSet fpSet -> do
+            mapM_ (\(Label srcLoc) -> prettyPrintSrcLoc srcLoc >> putStr ", ") (Set.toList fpSet)
+            putStrLn ""
+            prettyPrintTypedProg xs
+        _ -> return ()

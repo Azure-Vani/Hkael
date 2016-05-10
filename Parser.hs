@@ -53,6 +53,20 @@ lambda = do
   let srcLoc = SrcLoc start end
   return $ foldr (Lambda srcLoc) body args
 
+letdecl :: Parser Expr
+letdecl = do
+    start <- getPosition
+    reserved "let"
+    x <- identifier
+    args <- many1 identifier
+    reservedOp "="
+    e1 <- expr
+    reserved "in"
+    e2 <- expr
+    end <- getPosition
+    let srcloc = (SrcLoc start end)
+    return $ Let srcloc x (foldr (Lambda srcloc) e1 args) e2
+
 letin :: Parser Expr
 letin = do
   start <- getPosition
@@ -83,7 +97,8 @@ aexp =
   <|> bool
   <|> number
   <|> ifthen
-  <|> letin
+  <|> try letdecl
+  <|> try letin
   <|> lambda
   <|> variable
 
