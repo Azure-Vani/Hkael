@@ -25,3 +25,8 @@ Main
 *.synctex.gz
 *.pdf
 *.toc
+
+.DS_Store
+*.nav
+*.snm
+*.vrb
