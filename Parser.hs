@@ -1,235 +1,132 @@
-{-# LANGUAGE TypeOperators #-}
-module Parser where
+{-# LANGUAGE OverloadedStrings #-}
 
-import Data.Monoid
-import Data.Maybe
+module Parser (
+  parseExpr
+) where
 
-import Control.Monad
-import Control.Monad.Trans
-import Control.Monad.Trans.State
-import Control.Monad.Trans.Writer
+import Text.Parsec
+import Text.Parsec.Text.Lazy (Parser)
 
-import Language.Haskell.Exts (parseFile, fromParseResult)
-import Language.Haskell.Exts.Syntax hiding (Type, TyFun, TyTuple, TyList, TyApp, TyVar, TyCon)
+import qualified Text.Parsec.Pos as Pos
+import qualified Text.Parsec.Expr as Ex
+import qualified Text.Parsec.Token as Tok
 
-import Data
-import Environments
-import Utils
-import Constraints
+import qualified Data.Text.Lazy as L
 
--- Parsers
-serializedParse :: Monoid b => [a] -> (a -> Result b) -> Result b
-serializedParse [] f     = return mempty
-serializedParse (x:xs) f = (liftM2 mappend) (f x) (serializedParse xs f)
+import Lexer
+import Syntax
 
-parser :: FilePath -> Result ()
-parser filename = do
-    parsedModuleWithIO <- lift $ lift $ lift $ parseFile filename
-    let parsedModule = fromParseResult parsedModuleWithIO
-    case parsedModule of
-        Module _ name _ _ _ _ decls -> serializedParse decls parseDecl
+withPosParser :: Parser a -> Parser (a, SrcLoc)
+withPosParser p = do
+    start <- getPosition
+    x <- p
+    end <- getPosition
+    return (x, SrcLoc start end)
 
-parsePat :: Pat -> Result Type
-parsePat pat = case pat of
-    PVar name -> do
-        env <- get
-        ty <- lift getType
-        put $ addType (extractName name) ty env
-        return ty
+integer :: Parser Integer
+integer = Tok.integer lexer
 
-    PLit sign lit -> parseLit lit
+variable :: Parser Expr
+variable = do
+  (x, srcLoc) <- withPosParser identifier
+  return $ Var srcLoc x
 
-    PInfixApp p1 qname p2 -> do
-        env <- get
-        let consTy = lookupType (extractQName qname) env
-        let (t1, t2, t3) = case consTy of 
-                TyFun t1 x _ -> case x of
-                    TyFun t2 t3 _ -> (t1, t2, t3)
-        (t1', s1) <- subsituteTyName t1 id
-        t2' <- subsituteTyName t2
-parsePatWithType :: Type -> Pat -> Result ()
-parsePatWithType = undefined
+number :: Parser Expr
+number = do
+  (n, srcLoc) <- withPosParser integer
+  return $ Lit srcLoc (LInt (fromIntegral n))
 
-parseBinds :: Binds -> Result ()
-parseBinds bind = case bind of
-    BDecls decls -> serializedParse decls parseDecl
+bool :: Parser Expr
+bool = (withPosParser (reserved "True") >>= 
+            \(_, srcLoc) -> return $ Lit srcLoc (LBool True))
+    <|> (withPosParser (reserved "False") >>=
+            \(_, srcLoc) -> return $ Lit srcLoc (LBool False))
 
-parseStmt :: Stmt -> Result (Maybe Type)
-parseStmt stmt = case stmt of
-    Generator srcLoc pat exp -> undefined 
-    Qualifier exp -> do 
-        ty <- parseExp exp
-        return $ Just ty
-    LetStmt binds -> do 
-        parseBinds binds
-        return Nothing
+lambda :: Parser Expr
+lambda = do
+  start <- getPosition
+  reservedOp "\\"
+  args <- many identifier
+  reservedOp "->"
+  body <- expr
+  end <- getPosition
+  let srcLoc = SrcLoc start end
+  return $ foldr (Lambda srcLoc) body args
 
-parseAlt :: Type -> Alt -> Result Type
-parseAlt expType alt = case alt of
-    Alt srcLoc pat rhs binds -> do
-        env <- get
-        case binds of 
-            Just x -> parseBinds x
-            Nothing -> return ()
-        parsePatWithType expType pat
-        ty <- parseRhs rhs
-        put env
-        lift $ trackType ty
-        return ty
+letdecl :: Parser Expr
+letdecl = do
+    start <- getPosition
+    reserved "let"
+    x <- identifier
+    args <- many1 identifier
+    reservedOp "="
+    e1 <- expr
+    reserved "in"
+    e2 <- expr
+    end <- getPosition
+    let srcloc = (SrcLoc start end)
+    return $ Let srcloc x (foldr (Lambda srcloc) e1 args) e2
 
-atomVariable :: QName -> Result Type
-atomVariable qname = do
-    env <- get
-    label <- lift getLabel
-    let ty = lookupType (extractQName qname) env
-    lift $ trackType ty
-    return ty
+letin :: Parser Expr
+letin = do
+  start <- getPosition
+  reserved "let"
+  x <- identifier
+  reservedOp "="
+  e1 <- expr
+  reserved "in"
+  e2 <- expr
+  end <- getPosition
+  return $ Let (SrcLoc start end) x e1 e2
 
-parseLit :: Literal -> Result Type
-parseLit lit = do
-    label <- lift getLabel
-    let fp = atomfp label
-    return $ case lit of
-        Char c    -> TyCon tyString fp
-        Int  i    -> TyCon tyInt    fp
-        String st -> TyCon tyString fp
+ifthen :: Parser Expr
+ifthen = do
+  start <- getPosition
+  reserved "if"
+  cond <- aexp
+  reservedOp "then"
+  tr <- aexp
+  reserved "else"
+  fl <- aexp
+  end <- getPosition
+  return $ If (SrcLoc start end) cond tr fl
 
-parseExp :: Exp -> Result Type
-parseExp exp = case exp of
-    Var qname -> atomVariable qname
-    Con qname -> atomVariable qname
+aexp :: Parser Expr
+aexp =
+      parens expr
+  <|> bool
+  <|> number
+  <|> ifthen
+  <|> try letdecl
+  <|> try letin
+  <|> lambda
+  <|> variable
 
-    Lit lit -> do
-        ty <- parseLit lit         
-        lift $ trackType ty
-        return ty
+term :: Parser Expr
+term = Ex.buildExpressionParser table aexp
 
-    InfixApp exp1 op exp2 -> do
-        -- add constraint ty1 -> ty2 -> ty = type(op)
-        ty1 <- parseExp exp1
-        let opname = case op of 
-                QVarOp qname -> qname
-                QConOp qname -> qname
-        tyop <- atomVariable opname
-        ty2  <- parseExp exp2
-        ty   <- lift $ getType
-        t'   <- lift $ makeFunTy [ty1, ty2, ty] Nothing
-        lift $ lift $ constrain t' tyop
-        lift $ trackType ty
-        return ty
+infixOp :: String -> (SrcLoc -> a -> a -> a) -> Ex.Assoc -> Op a
+infixOp x f = Ex.Infix $ 
+    withPosParser (reservedOp x) >>= (\(_, srcLoc) -> return $ f srcLoc)
 
-    App exp1 exp2 -> do
-        -- add constraint ty2 -> ty = type(exp1)
-        ty1 <- parseExp exp1
-        ty2 <- parseExp exp2
-        ty  <- lift $ getType   
-        x   <- lift $ makeFunTy [ty2, ty] Nothing
-        lift $ lift $ constrain x ty1
-        lift $ trackType ty
-        return ty
+table :: Operators Expr
+table = [
+    [
+      infixOp "*" (Op Mul) Ex.AssocLeft
+    ],
+    [
+      infixOp "+" (Op Add) Ex.AssocLeft
+    , infixOp "-" (Op Sub) Ex.AssocLeft
+    ],
+    [
+      infixOp "==" (Op Eql) Ex.AssocLeft
+    ]
+  ]
 
-    Lambda srcLoc pats exp -> do
-        env <- get
-        argTys <- mapM parsePat pats
-        bodyTy <- parseExp exp
-        label <- lift $ getLabel
-        let fp = atomfp label
-        ty <- lift $ makeFunTy (argTys ++ [bodyTy]) Nothing
-        put env
-        lift $ trackType ty
-        return ty
-        
-    Let binds exp -> do
-        env <- get
-        parseBinds binds
-        ty <- parseExp exp
-        put env
-        lift $ trackType ty
-        return ty
+expr :: Parser Expr
+expr = do
+  (es, srcLoc) <- withPosParser $ many1 term
+  return (foldl1 (App srcLoc) es)
 
-    If condition thenExp elseExp -> do
-        condType <- parseExp condition
-        thenType <- parseExp thenExp
-        elseType <- parseExp elseExp
-        lname    <- lift $ getLabelName 
-        lift $ lift $ constrain condType (TyCon tyBool lname)
-        lift $ lift $ constrain thenType elseType
-        lift $ trackType thenType
-        return thenType
-
-    Case exp alts -> do
-        expType <- parseExp exp
-        altTypes <- mapM (parseAlt expType) alts
-        lift $ lift $ mergeM altTypes constrain
-        lift $ trackType $ head altTypes
-        return $ head altTypes
-
-    Do stmts -> undefined
-
-    Tuple boxed exps -> do
-        expTypes <- mapM parseExp exps
-        label <- lift getLabel
-        let ty = TyTuple expTypes (atomfp label)
-        lift $ trackType ty
-        return ty
-
-    List exps -> do 
-        expTypes <- mapM parseExp exps
-        label <- lift getLabel
-        let ty = TyList (head expTypes) (atomfp label)
-        lift $ trackType ty
-        return ty
-
-parseRhs :: Rhs -> Result Type
-parseRhs rhs = case rhs of
-    UnGuardedRhs exp -> parseExp exp
-    GuardedRhss guardedRhss -> do
-        tys <- mapM parseGuardedRhs guardedRhss
-        return $ head tys
-
-parseGuardedRhs :: GuardedRhs -> Result Type
-parseGuardedRhs guardedRhs = case guardedRhs of
-    GuardedRhs srcLoc stmts exp -> do
-        {- Not support patterns guard yet -}
-        maybeTy <- parseStmt $ head stmts
-        lname <- lift getLabelName
-        lift $ lift $ constrain (fromJust maybeTy) (TyCon tyBool lname)
-        parseExp exp
-
-parseMatch :: Match -> Result ()
-parseMatch match = case match of
-    Match srcLoc name pats Nothing rhs binds -> do
-        -- get current env
-        env <- get
-        -- parse all arguments one by one
-        argTys <- mapM parsePat pats
-        -- add variables in `where` clause
-        case binds of
-            Just x -> parseBinds x
-            Nothing -> return ()
-        -- parse function body
-        bodyTy <- parseRhs rhs
-        let funcName = extractName name
-        funcTy <- lift $ makeFunTy (argTys ++ [bodyTy]) Nothing
-        -- recovery env and add this function to env
-        put $ addType funcName funcTy env
-        return  ()
-
-parseDecl :: Decl -> Result ()
-parseDecl decl = case decl of
-    TypeDecl  srcLoc name tyVars ty                            -> undefined
-    DataDecl  srcLoc dataorNew context name tyVars _ _         -> undefined
-    ClassDecl srcLoc context name tyVars funDeps classDecl     -> undefined
-    InstDecl  srcLoc overlap tyVars context name tys instDecls -> undefined
-    TypeSig   srcLoc names ty                                  -> undefined
-    FunBind   matches                                          -> serializedParse matches parseMatch
-    PatBind   srcLoc pat rhs binds                             -> do
-        -- add arguments to current env
-        parsePat pat
-        -- add variables in `where` clause
-        case binds of
-            Just x  -> parseBinds x
-            Nothing -> return ()
-        parseRhs rhs
-        return ()
-
+parseExpr :: L.Text -> Either ParseError Expr
+parseExpr input = parse (contents expr) "filename" input

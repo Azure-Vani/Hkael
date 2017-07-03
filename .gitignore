@@ -15,8 +15,18 @@ cabal.sandbox.config
 *.hp
 .stack-work/
 
-test.hs
-analysis*
+analysis
+log
 
-*.swp
-*.swo
+test.hs
+Main
+*.out
+*.log
+*.synctex.gz
+*.pdf
+*.toc
+
+.DS_Store
+*.nav
+*.snm
+*.vrb
